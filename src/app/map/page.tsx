@@ -2,6 +2,15 @@ import { supabase } from '@/lib/supabase'
 import ChurchMap from '@/components/ChurchMap'
 import Link from 'next/link'
 
+// Shape of the querystring parameters we support on the map page
+export type SearchParams = {
+  q?: string
+  belief?: string
+  region?: string
+  country?: string
+}
+
+// Row subset needed for map pins
 type Row = {
   church_id: string
   name: string
@@ -16,9 +25,9 @@ type Row = {
 export default async function MapPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; belief?: string; region?: string; country?: string }>
+  searchParams: Promise<SearchParams>
 }) {
-  const sp = await searchParams
+  const sp: SearchParams = await searchParams
 
   // Build filtered query directly for the pins we render
   let query = supabase
@@ -40,11 +49,18 @@ export default async function MapPage({
     .filter((r) => typeof r.latitude === 'number' && typeof r.longitude === 'number')
     .map((r) => ({ ...r, latitude: r.latitude!, longitude: r.longitude! }))
 
+  // Build a safe querystring for the back-link without using `any`
+  const queryString = (() => {
+    const entries = Object.entries(sp)
+      .filter(([, v]) => typeof v === 'string' && v.length > 0) as [string, string][]
+    return entries.length ? `?${new URLSearchParams(entries).toString()}` : ''
+  })()
+
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Church Map</h1>
-        <Link className="underline" href={"/" + (sp ? `?${new URLSearchParams(sp as any).toString()}` : '')}>
+        <Link className="underline" href={`/${queryString}`}>
           ← List
         </Link>
       </div>
