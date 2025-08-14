@@ -27,13 +27,14 @@ export default function Filters() {
   const [region, setRegion] = useState(sp.get("region") ?? "")
   const [country, setCountry] = useState(sp.get("country") ?? "")
 
+  const spKey = sp.toString()
   // keep local state in sync when navigating (use string snapshot to avoid re-running on every render)
   useEffect(() => {
     setQ(sp.get("q") ?? "")
     setBelief((sp.get("belief") as Belief) ?? "")
     setRegion(sp.get("region") ?? "")
     setCountry(sp.get("country") ?? "")
-  }, [sp.toString()])
+  }, [spKey])
 
   function submit() {
     const params = new URLSearchParams()
