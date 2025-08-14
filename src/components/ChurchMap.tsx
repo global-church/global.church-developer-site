@@ -1,7 +1,7 @@
 'use client'
 
+import { useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
-import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import Link from 'next/link'
 
@@ -16,20 +16,6 @@ type ChurchPin = {
   website: string | null
 }
 
-const defaultIcon = L.icon({
-  iconUrl:
-    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconRetinaUrl:
-    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl:
-    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-})
-L.Marker.prototype.options.icon = defaultIcon
-
 export default function ChurchMap({
   pins,
   center = [39.5, -98.35], // US center-ish
@@ -39,6 +25,24 @@ export default function ChurchMap({
   center?: [number, number]
   zoom?: number
 }) {
+  // Set Leaflet's default marker icon at runtime via dynamic import
+  useEffect(() => {
+    (async () => {
+      // Dynamically import leaflet so TypeScript doesn't require type declarations at build time
+      const L = await import('leaflet')
+      const defaultIcon = L.icon({
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41],
+      })
+      L.Marker.prototype.options.icon = defaultIcon
+    })()
+  }, [])
+
   return (
     <div className="h-[75vh] w-full rounded-xl overflow-hidden border">
       <MapContainer center={center} zoom={zoom} scrollWheelZoom className="h-full w-full">
