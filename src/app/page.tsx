@@ -2,46 +2,27 @@
 import type { Metadata } from "next"
 import { supabase } from "@/lib/supabase"
 import { ChurchPublic } from "@/lib/types"
-import { Card, CardHeader, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import MobileSearch from "@/components/MobileSearch"
+import ChurchCard from "@/components/ChurchCard"
+import SectionHeader from "@/components/SectionHeader"
+import MobileNavigation from "@/components/MobileNavigation"
 import Link from "next/link"
-import Filters from "@/components/Filters"
+import { MapPin } from "lucide-react"
 
 export const metadata: Metadata = {
-  title: "Church Finder",
-  description: "Global.Church demo – churches near you",
+  title: "Church Finding",
+  description: "Find churches near you with our comprehensive directory",
 }
 
-async function getChurches(
-  filters: { q?: string; belief?: string; region?: string; country?: string } = {}
-): Promise<ChurchPublic[]> {
-  // Server component fetch using Supabase JS
-  // Limit the fields to what we actually render
-  let query = supabase
+async function getChurches(): Promise<ChurchPublic[]> {
+  // Get churches ordered alphabetically by city (locality)
+  const { data, error } = await supabase
     .from("church_public")
-    .select(
-      "church_id,name,locality,region,country,website,belief_type,trinitarian_beliefs,latitude,longitude,church_summary"
-    )
-    .order("name", { ascending: true })
-    .limit(100)
+    .select("church_id,name,locality,region,country,belief_type")
+    .not('locality', 'is', null) // Ensure locality exists
+    .order("locality", { ascending: true }) // Order by city
+    .limit(20) // Limit to first 20 churches
 
-  const { q, belief, region, country } = filters
-
-  if (q && q.trim().length > 0) {
-    // basic case-insensitive name filter
-    query = query.ilike("name", `%${q.trim()}%`)
-  }
-  if (belief && belief !== "any") {
-    query = query.eq("belief_type", belief)
-  }
-  if (region && region.trim().length > 0) {
-    query = query.eq("region", region)
-  }
-  if (country && country.trim().length > 0) {
-    query = query.eq("country", country)
-  }
-
-  const { data, error } = await query
   if (error) {
     console.error(error)
     return []
@@ -49,87 +30,58 @@ async function getChurches(
   return (data ?? []) as ChurchPublic[]
 }
 
-export default async function Page({
-  searchParams,
-}: {
-  searchParams: Promise<{ q?: string; belief?: string; region?: string; country?: string }>
-}) {
-  const sp = await searchParams
-  const rows = await getChurches(sp)
-
-  // Build a map link that preserves current filters
-  const mapParams = new URLSearchParams()
-  if (sp.q) mapParams.set("q", sp.q)
-  if (sp.belief) mapParams.set("belief", sp.belief)
-  if (sp.region) mapParams.set("region", sp.region)
-  if (sp.country) mapParams.set("country", sp.country)
-  const mapHref = `/map${mapParams.toString() ? `?${mapParams.toString()}` : ""}`
+export default async function Page() {
+  const churches = await getChurches()
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-semibold tracking-tight">Global.Church Enriched Directory</h1>
-      <div className="mt-2">
-        <a href={mapHref} className="text-sm underline">View Map →</a>
+    <div className="min-h-screen bg-gray-50 pb-20">
+      {/* Header */}
+      <div className="bg-white px-4 py-6 text-center">
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">Global.Church Index</h1>
+        
+        {/* Map Button */}
+        <Link 
+          href="/map"
+          className="inline-flex items-center gap-2 bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+        >
+          <MapPin size={18} />
+          View Map
+        </Link>
       </div>
 
-      {/* Filters (client component) */}
-      <div className="mt-4 mb-6">
-        <Filters />
+      {/* Search Bar */}
+      <MobileSearch />
+
+      {/* Main Content */}
+      <div className="px-4 py-6 space-y-8">
+        {/* Churches */}
+        <section>
+          <SectionHeader 
+            title="Churches" 
+            href="/nearby" 
+            actionText="View all"
+          />
+          <div className="space-y-3">
+            {churches.length > 0 ? (
+              churches.map((church) => (
+                <ChurchCard 
+                  key={church.church_id} 
+                  church={church} 
+                  variant="compact" 
+                  showMapButton={false} // Remove individual map buttons since we have a global one
+                />
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>No churches found</p>
+              </div>
+            )}
+          </div>
+        </section>
       </div>
 
-      <div className="grid gap-3">
-        {rows.length === 0 && (
-          <p className="text-sm text-muted-foreground">No results.</p>
-        )}
-
-        {rows.map((c) => (
-          <Card key={c.church_id} className="hover:shadow-sm transition-shadow">
-            <CardHeader className="flex-row items-center gap-4">
-              <div className="size-10 rounded-full bg-gradient-to-br from-teal-200 to-emerald-300 grid place-items-center text-lg font-medium text-slate-800">
-                {c.name?.charAt(0).toUpperCase() ?? "C"}
-              </div>
-              <div>
-                <div className="font-medium leading-tight">{c.name}</div>
-                <div className="text-xs text-muted-foreground">
-                  {[c.locality, c.region, c.country].filter(Boolean).join(", ")}
-                </div>
-              </div>
-              <div className="ml-auto flex items-center gap-2">
-                {c.belief_type && (
-                  <Badge variant="secondary" className="capitalize">
-                    {c.belief_type.replace("_", " ")}
-                  </Badge>
-                )}
-                {c.trinitarian_beliefs === true && (
-                  <Badge variant="outline">Trinitarian</Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="text-sm">
-              <p className="line-clamp-3">
-                {c.church_summary ?? "No summary yet."}
-              </p>
-              <div className="mt-3 flex gap-3 text-sm">
-                {c.website && (
-                  <Link
-                    href={c.website}
-                    target="_blank"
-                    className="underline underline-offset-4"
-                  >
-                    Website
-                  </Link>
-                )}
-                <Link
-                  href={`/church/${c.church_id}`}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  Details →
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </main>
+      {/* Mobile Navigation */}
+      <MobileNavigation />
+    </div>
   )
 }

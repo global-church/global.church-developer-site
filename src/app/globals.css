@@ -119,4 +119,63 @@
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* Mobile-specific styles */
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Ensure proper mobile viewport */
+  @media (max-width: 768px) {
+    body {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+  }
+  
+  /* Custom scrollbar for mobile */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  
+  .overflow-x-auto::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Custom map marker styles */
+  .custom-marker {
+    background: transparent !important;
+    border: none !important;
+  }
+  
+  /* Ensure custom markers are properly positioned and visible */
+  .custom-marker div {
+    pointer-events: none;
+  }
+  
+  /* Override any default Leaflet marker styles */
+  .leaflet-marker-icon.custom-marker {
+    background: transparent !important;
+    border: none !important;
+  }
+  
+  /* Additional overrides to ensure custom markers work */
+  .leaflet-marker-icon {
+    background: transparent !important;
+  }
+  
+  /* Force custom marker display */
+  .custom-marker {
+    display: block !important;
+    visibility: visible !important;
+  }
+  
+  /* Ensure the custom marker content is visible */
+  .custom-marker > div {
+    display: flex !important;
+    visibility: visible !important;
+  }
 }
