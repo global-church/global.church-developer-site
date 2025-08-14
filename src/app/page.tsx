@@ -74,14 +74,7 @@ export default async function Page({
 
       {/* Filters (client component) */}
       <div className="mt-4 mb-6">
-        <Filters
-          initial={{
-            q: sp.q ?? "",
-            belief: sp.belief ?? "any",
-            region: sp.region ?? "",
-            country: sp.country ?? "US",
-          }}
-        />
+        <Filters />
       </div>
 
       <div className="grid gap-3">
