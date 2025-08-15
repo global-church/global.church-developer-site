@@ -1,5 +1,4 @@
 import { Church } from 'lucide-react'
-import MobileNavigation from '@/components/MobileNavigation'
 
 export default function MyChurchPage() {
   return (
@@ -17,8 +16,7 @@ export default function MyChurchPage() {
         <p className="text-gray-600">This feature is under development.</p>
       </div>
 
-      {/* Mobile Navigation */}
-      <MobileNavigation />
+      {/* Mobile Navigation provided by global layout */}
     </div>
   )
 }
