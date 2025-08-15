@@ -110,8 +110,8 @@ export default async function ChurchPage({
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-4 z-50">
+      {/* Action Buttons (sit above persistent bottom nav) */}
+      <div className="fixed bottom-20 left-0 right-0 bg-white border-t border-gray-200 px-4 py-4 z-50">
         <div className="flex gap-3">
           <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 text-base font-medium">
             I'm Interested
@@ -122,27 +122,7 @@ export default async function ChurchPage({
         </div>
       </div>
 
-      {/* Mobile Navigation */}
-      <div className="fixed bottom-20 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 z-40">
-        <div className="flex justify-around items-center">
-          <Link href="/chat" className="flex flex-col items-center py-2 px-3 text-gray-400">
-            <div className="w-5 h-5 bg-gray-300 rounded-full"></div>
-            <span className="text-xs mt-1">Chat</span>
-          </Link>
-          <Link href="/" className="flex flex-col items-center py-2 px-3 text-green-600">
-            <div className="w-5 h-5 bg-green-600 rounded-full"></div>
-            <span className="text-xs mt-1">Explore</span>
-          </Link>
-          <Link href="/my-church" className="flex flex-col items-center py-2 px-3 text-gray-400">
-            <div className="w-5 h-5 bg-gray-300 rounded-full"></div>
-            <span className="text-xs mt-1">My Church</span>
-          </Link>
-          <Link href="/profile" className="flex flex-col items-center py-2 px-3 text-gray-400">
-            <div className="w-5 h-5 bg-gray-300 rounded-full"></div>
-            <span className="text-xs mt-1">Me</span>
-          </Link>
-        </div>
-      </div>
+      {/* Mobile Navigation provided by global layout (appears below action buttons) */}
     </div>
   )
 }
