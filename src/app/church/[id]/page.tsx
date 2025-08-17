@@ -10,6 +10,8 @@ import Link from "next/link"
 
 export const dynamic = 'force-dynamic'
 
+type ChurchWithOptionalRoot = ChurchPublic & { website_root?: string | null }
+
 export default async function ChurchPage({
   params,
 }: { params: Promise<{ id: string }> }) {
@@ -39,7 +41,7 @@ export default async function ChurchPage({
       </div>
     )
   }
-  const church = data as unknown as ChurchPublic
+  const church = data as unknown as ChurchWithOptionalRoot
 
   const languages: string[] = Array.isArray(church.service_languages)
     ? church.service_languages
@@ -342,7 +344,7 @@ export default async function ChurchPage({
 
         {/* Visit Website moved below Programs */}
         {(() => {
-          const raw = church.website || (church as any).website_root
+          const raw = church.website || church.website_root || null
           if (!raw) return null
           const url = raw.startsWith('http') ? raw : `https://${raw}`
           return (

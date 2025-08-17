@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, ZoomControl } from 'react-leaflet'
-import type { DivIcon, LatLngBoundsExpression, Map as LeafletMap } from 'leaflet'
+import type { DivIcon, LatLngBoundsExpression } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import Link from 'next/link'
 

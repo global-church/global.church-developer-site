@@ -35,7 +35,13 @@ export default async function Page() {
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
-      <div className="bg-white px-4 py-6 text-center">
+      <div className="bg-white px-4 py-6 text-center relative">
+        <Link
+          href="/give"
+          className="absolute right-4 top-4 inline-flex items-center gap-2 bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+        >
+          Support Global.Church
+        </Link>
         <h1 className="text-2xl font-bold text-gray-900 mb-4">Global.Church Index</h1>
         
         {/* Map Button */}
