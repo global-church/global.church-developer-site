@@ -7,6 +7,13 @@ import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import LanguageFilterButton from '@/components/LanguageFilterButton'
 
+type SearchContext = 'home' | 'search'
+
+interface MobileSearchProps {
+  context?: SearchContext
+  initialQuery?: string
+}
+
 const BELIEF_OPTIONS = [
   { value: 'protestant', label: 'Protestant' },
   { value: 'roman_catholic', label: 'Roman Catholic' },
@@ -17,8 +24,8 @@ const BELIEF_OPTIONS = [
 
 type BeliefValue = typeof BELIEF_OPTIONS[number]['value']
 
-export default function MobileSearch() {
-  const [searchQuery, setSearchQuery] = useState('')
+export default function MobileSearch({ context = 'home', initialQuery = '' }: MobileSearchProps) {
+  const [searchQuery, setSearchQuery] = useState(initialQuery)
   const [filterOpen, setFilterOpen] = useState(false)
   const [selectedBeliefs, setSelectedBeliefs] = useState<Set<BeliefValue>>(new Set())
   const router = useRouter()
@@ -39,9 +46,16 @@ export default function MobileSearch() {
   const selectedCount = selectedBeliefs.size
 
   const handleSearch = () => {
-    if (searchQuery.trim()) {
-      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
+    const q = searchQuery.trim()
+    if (!q) return
+    const params = new URLSearchParams()
+    params.set('q', q)
+    if (selectedBeliefs.size) {
+      params.set('belief', Array.from(selectedBeliefs).join(','))
     }
+    const language = sp.get('language')
+    if (language) params.set('language', language)
+    router.push(`/search?${params.toString()}`)
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -61,14 +75,38 @@ export default function MobileSearch() {
 
   function applyFilters() {
     const csv = Array.from(selectedBeliefs).join(',')
-    const url = csv ? `/?belief=${encodeURIComponent(csv)}` : '/'
-    router.push(url)
+    const language = sp.get('language')
+    if (context === 'search') {
+      const qParam = (sp.get('q') || searchQuery.trim())
+      const params = new URLSearchParams()
+      if (qParam) params.set('q', qParam)
+      if (csv) params.set('belief', csv)
+      if (language) params.set('language', language)
+      router.push(`/search${params.toString() ? `?${params.toString()}` : ''}`)
+    } else {
+      const params = new URLSearchParams()
+      if (csv) params.set('belief', csv)
+      if (language) params.set('language', language)
+      router.push(`/${params.toString() ? `?${params.toString()}` : ''}`)
+    }
     setFilterOpen(false)
   }
 
   function clearFilters() {
     setSelectedBeliefs(new Set())
-    router.push('/')
+    if (context === 'search') {
+      const qParam = (sp.get('q') || searchQuery.trim())
+      const params = new URLSearchParams()
+      if (qParam) params.set('q', qParam)
+      const language = sp.get('language')
+      if (language) params.set('language', language)
+      router.push(`/search${params.toString() ? `?${params.toString()}` : ''}`)
+    } else {
+      const language = sp.get('language')
+      const params = new URLSearchParams()
+      if (language) params.set('language', language)
+      router.push(`/${params.toString() ? `?${params.toString()}` : ''}`)
+    }
     setFilterOpen(false)
   }
 

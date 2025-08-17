@@ -1,9 +1,10 @@
 import type { Metadata } from "next"
 import { supabase } from "@/lib/supabase"
-import { ChurchPublic } from "@/lib/types"
+import { ChurchPublic, BeliefType } from "@/lib/types"
 import ChurchCard from "@/components/ChurchCard"
 import { Badge } from "@/components/ui/badge"
 import { MapPin, Church, ArrowLeft, List, Map as MapIcon } from "lucide-react"
+import MobileSearch from "@/components/MobileSearch"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
@@ -12,8 +13,8 @@ export const metadata: Metadata = {
   description: "Search results for churches",
 }
 
-async function searchChurches(query: string): Promise<ChurchPublic[]> {
-  const baseSelect = "church_id,name,locality,region,country,belief_type,church_summary"
+async function searchChurches(query: string, selectedBeliefs: BeliefType[], selectedLanguages: string[]): Promise<ChurchPublic[]> {
+  const baseSelect = "church_id,name,locality,region,country,belief_type,church_summary,service_languages,services_info"
 
   // Primary: case-insensitive substring across multiple fields
   const like = `%${query}%`
@@ -25,11 +26,19 @@ async function searchChurches(query: string): Promise<ChurchPublic[]> {
     `church_summary.ilike.${like}`,
   ].join(',')
 
-  const { data, error } = await supabase
+  let primaryQuery = supabase
     .from("church_public")
     .select(baseSelect)
     .or(orFilter)
-    .limit(200)
+
+  if (selectedBeliefs && selectedBeliefs.length > 0) {
+    primaryQuery = primaryQuery.in('belief_type', selectedBeliefs as unknown as string[])
+  }
+  if (selectedLanguages && selectedLanguages.length > 0) {
+    primaryQuery = primaryQuery.overlaps('service_languages', selectedLanguages)
+  }
+
+  const { data, error } = await primaryQuery.limit(200)
 
   if (error) {
     console.error(error)
@@ -82,10 +91,18 @@ async function searchChurches(query: string): Promise<ChurchPublic[]> {
   }
 
   // Fallback: fetch a larger sample and rank by client-side similarity to surface slight typos
-  const { data: sample, error: sampleError } = await supabase
+  let fallbackQuery = supabase
     .from("church_public")
     .select(baseSelect)
-    .limit(600)
+
+  if (selectedBeliefs && selectedBeliefs.length > 0) {
+    fallbackQuery = fallbackQuery.in('belief_type', selectedBeliefs as unknown as string[])
+  }
+  if (selectedLanguages && selectedLanguages.length > 0) {
+    fallbackQuery = fallbackQuery.overlaps('service_languages', selectedLanguages)
+  }
+
+  const { data: sample, error: sampleError } = await fallbackQuery.limit(600)
 
   if (sampleError || !sample) {
     if (sampleError) console.error(sampleError)
@@ -130,22 +147,44 @@ async function searchChurches(query: string): Promise<ChurchPublic[]> {
 export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>
+  searchParams: Promise<{ q?: string; belief?: string; language?: string }>
 }) {
-  const { q } = await searchParams
+  const { q, belief, language } = await searchParams
   
   if (!q) {
     notFound()
   }
 
-  const churches = await searchChurches(q)
+  const selectedBeliefs: BeliefType[] = (belief
+    ? belief
+        .split(",")
+        .map((s) => s.trim().toLowerCase())
+        .filter((s): s is BeliefType =>
+          [
+            'protestant',
+            'roman_catholic',
+            'orthodox',
+            'anglican',
+            'other',
+          ].includes(s as BeliefType)
+        )
+    : []) as BeliefType[]
+
+  const selectedLanguages: string[] = (language
+    ? language
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
+    : [])
+
+  const churches = await searchChurches(q, selectedBeliefs, selectedLanguages)
   
   // Extract location and belief from search query for filter chips
   const locationMatch = q.match(/(?:near|in)\s+([^,]+(?:,\s*[A-Z]{2})?)/i)
   const beliefMatch = q.match(/(protestant|anglican|roman\s+catholic|orthodox|other)/i)
   
   const location = locationMatch ? locationMatch[1] : null
-  const belief = beliefMatch ? beliefMatch[1].replace(/\s+/, '_') : null
+  const beliefFromQuery = beliefMatch ? beliefMatch[1].replace(/\s+/, '_') : null
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -158,19 +197,12 @@ export default async function SearchPage({
           <h1 className="text-xl font-semibold text-gray-900">Global.Church Index</h1>
         </div>
         
-        {/* Search Bar */}
-        <div className="relative">
-          <input
-            type="text"
-            defaultValue={q}
-            placeholder="Try 'Protestant Churches Near Denver'"
-            className="w-full pl-4 pr-4 py-3 text-base border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
-          />
-        </div>
+        {/* Search Bar (re-usable, keeps filters visible and actionable) */}
+        <MobileSearch context="search" initialQuery={q} />
       </div>
 
       {/* Filter Chips */}
-      {(location || belief) && (
+      {(location || beliefFromQuery) && (
         <div className="bg-white px-4 py-3 border-b border-gray-200">
           <div className="flex gap-2">
             {location && (
@@ -179,10 +211,10 @@ export default async function SearchPage({
                 {location}
               </Badge>
             )}
-            {belief && (
+            {beliefFromQuery && (
               <Badge variant="secondary" className="flex items-center gap-1 px-3 py-1">
                 <Church size={14} />
-                {belief.replace('_', ' ')}
+                {beliefFromQuery.replace('_', ' ')}
               </Badge>
             )}
           </div>
