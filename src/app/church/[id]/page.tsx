@@ -13,8 +13,8 @@ export const dynamic = 'force-dynamic'
 
 export default async function ChurchPage({
   params,
-}: { params: { id: string } }) {
-  const { id } = params
+}: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const { data, error } = await supabase
     .from("church_public")
     .select("*")
