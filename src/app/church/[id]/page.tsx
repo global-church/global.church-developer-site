@@ -7,7 +7,6 @@ import ContentCard from "@/components/ContentCard"
 import SectionHeader from "@/components/SectionHeader"
 import { ArrowLeft, MoreVertical, MapPin, Instagram, Youtube, Mail, ExternalLink } from "lucide-react"
 import Link from "next/link"
-import { notFound } from "next/navigation"
 
 export const dynamic = 'force-dynamic'
 
@@ -45,6 +44,56 @@ export default async function ChurchPage({
   const languages: string[] = Array.isArray(church.service_languages)
     ? church.service_languages
     : (church.service_languages ? String(church.service_languages).split(',').map(s => s.trim()).filter(Boolean) : [])
+
+  // Parse services_info JSON string into structured lines (robust regex)
+  const serviceLines = (() => {
+    const raw = church.services_info
+    if (!raw) return [] as { language: string; day: string; time: string; description: string }[]
+
+    let items: string[] = []
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) items = parsed as string[]
+      else if (typeof parsed === 'string') items = [parsed]
+    } catch {
+      items = String(raw).split(/\n|;|\|/).map((s) => s.trim()).filter(Boolean)
+    }
+
+    const dayMap: Record<string, string> = {
+      Sun: 'Sundays', Mon: 'Mondays', Tue: 'Tuesdays', Tues: 'Tuesdays', Wed: 'Wednesdays', Thu: 'Thursdays', Thurs: 'Thursdays', Fri: 'Fridays', Sat: 'Saturdays',
+    }
+
+    const re = /^\s*([^:]+):\s*([A-Za-z]+)\s+(\d{1,2}:\d{2}\s*(?:AM|PM))\s*(?:\(([^)]+)\))?\s*$/i
+
+    return items.map((item) => {
+      let language = ''
+      let day = ''
+      let time = ''
+      let description = 'Service'
+
+      const m = item.match(re)
+      if (m) {
+        language = (m[1] || '').trim()
+        const dayAbbrev = (m[2] || '').trim()
+        day = dayMap[dayAbbrev] || dayAbbrev
+        time = (m[3] || '').trim()
+        description = (m[4] || 'Service').trim()
+      } else {
+        // Fallback: previous loose parsing
+        const [langPart, restRaw] = item.split(':', 2)
+        language = (langPart || '').trim()
+        const descMatch = restRaw?.match(/\(([^)]+)\)/)
+        description = (descMatch?.[1] || 'Service').trim()
+        const rest = (restRaw || '').replace(/\([^)]*\)/, '').trim()
+        const tokens = rest.split(/\s+/).filter(Boolean)
+        const dayAbbrev = tokens.shift() || ''
+        day = dayMap[dayAbbrev] || dayAbbrev
+        time = tokens.join(' ').trim()
+      }
+
+      return { language, day, time, description }
+    })
+  })()
 
   return (
     <div className="min-h-screen bg-gray-50 pb-32">
@@ -135,16 +184,6 @@ export default async function ChurchPage({
         </div>
       </div>
 
-      {/* Serve Section */}
-      <div className="px-4 py-6">
-        <SectionHeader title="Serve" />
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-gray-600 text-center">
-            Find opportunities to serve and get involved in our community.
-          </p>
-        </div>
-      </div>
-
       {/* Details */}
       <div className="px-4 py-2 space-y-4">
         {(church.instagram_url || church.youtube_url || church.scraped_email || church.church_beliefs_url) && (
@@ -197,34 +236,28 @@ export default async function ChurchPage({
           </div>
         )}
 
-        {church.address && (
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Address</h3>
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-2">
-                <MapPin size={16} className="text-gray-400 mt-1" />
-                <span className="text-gray-700">{church.address}</span>
-              </div>
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(church.address)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-green-700 hover:text-green-800 font-medium"
-              >
-                Directions →
-              </a>
-            </div>
-          </div>
-        )}
-
         {(church.services_info || church.service_languages) && (
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <h3 className="text-sm font-medium text-gray-700 mb-3">Services</h3>
-            {church.services_info && (
-              <p className="text-gray-700 mb-3">{church.services_info}</p>
+            {serviceLines.length > 0 && (
+              <div className="space-y-2">
+                {serviceLines.map((s, idx) => (
+                  <div key={`${s.language}-${s.day}-${s.time}-${idx}`} className="text-center text-gray-800">
+                    <span className="font-medium">{s.description}</span>
+                    {s.day && s.time && (
+                      <span>{` on ${s.day} @ ${s.time} `}</span>
+                    )}
+                    <em className="text-gray-500">{s.language}</em>
+                  </div>
+                ))}
+              </div>
             )}
+            {serviceLines.length === 0 && church.services_info && (
+              <p className="text-gray-700 text-center">Service times available</p>
+            )}
+
             {church.service_languages && (
-              <div className="flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap gap-2 justify-center">
                 {(
                   Array.isArray(church.service_languages)
                     ? church.service_languages
@@ -242,6 +275,26 @@ export default async function ChurchPage({
                   ))}
               </div>
             )}
+          </div>
+        )}
+
+        {church.address && (
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Address</h3>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2">
+                <MapPin size={16} className="text-gray-400 mt-1" />
+                <span className="text-gray-700">{church.address}</span>
+              </div>
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(church.address)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-green-700 hover:text-green-800 font-medium"
+              >
+                Directions →
+              </a>
+            </div>
           </div>
         )}
 
