@@ -9,8 +9,8 @@ import Link from 'next/link'
 
 export default function LeafletMapInner({
 	pins,
-	center = [39.5, -98.35],
-	zoom = 4,
+	center = [25, 10],
+	zoom = 2,
 }: {
 	pins: {
 		church_id: string
@@ -87,7 +87,7 @@ export default function LeafletMapInner({
 		console.log('Waiting for custom icon to be created...')
 		return (
 			<div className="h-full w-full">
-				<MapContainer center={center} zoom={zoom} scrollWheelZoom className="h-full w-full">
+				<MapContainer center={center} zoom={zoom} scrollWheelZoom worldCopyJump={true} maxBounds={[[-85, -180], [85, 180]]} maxBoundsViscosity={1.0} className="h-full w-full">
 					<TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 				</MapContainer>
 			</div>
@@ -98,7 +98,7 @@ export default function LeafletMapInner({
 
 	return (
 		<div className="h-full w-full">
-			<MapContainer center={center} zoom={zoom} scrollWheelZoom className="h-full w-full">
+			<MapContainer center={center} zoom={zoom} scrollWheelZoom worldCopyJump={true} maxBounds={[[-85, -180], [85, 180]]} maxBoundsViscosity={1.0} className="h-full w-full">
 				<TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 				{pins.map((p) => (
 					<Marker 

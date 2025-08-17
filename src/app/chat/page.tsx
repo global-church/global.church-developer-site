@@ -1,5 +1,4 @@
 import { MessageCircle } from 'lucide-react'
-import MobileNavigation from '@/components/MobileNavigation'
 
 export default function ChatPage() {
   return (
@@ -17,8 +16,7 @@ export default function ChatPage() {
         <p className="text-gray-600">This feature is under development.</p>
       </div>
 
-      {/* Mobile Navigation */}
-      <MobileNavigation />
+      {/* Mobile Navigation provided by global layout */}
     </div>
   )
 }

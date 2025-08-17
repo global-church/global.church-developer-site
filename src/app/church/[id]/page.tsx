@@ -1,26 +1,46 @@
 // src/app/church/[id]/page.tsx
 import { supabase } from "@/lib/supabase"
+import { ChurchPublic } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import ContentCard from "@/components/ContentCard"
 import SectionHeader from "@/components/SectionHeader"
-import { ArrowLeft, MoreVertical, MapPin } from "lucide-react"
+import { ArrowLeft, MoreVertical, MapPin, Instagram, Youtube, Mail, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
+export const dynamic = 'force-dynamic'
+
 export default async function ChurchPage({
   params,
-}: { params: Promise<{ id: string }> }) {
-  const { id } = await params
+}: { params: { id: string } }) {
+  const { id } = params
   const { data, error } = await supabase
     .from("church_public")
     .select("*")
     .eq("church_id", id)
-    .single()
+    .maybeSingle()
 
-  if (error || !data) {
-    notFound()
+  if (error) {
+    console.error("Failed to load church", { id, error })
   }
+  if (!data) {
+    // Graceful empty state rather than a 404 so users can recover
+    return (
+      <div className="min-h-screen bg-gray-50 pb-32">
+        <div className="bg-white px-4 py-4 border-b border-gray-200">
+          <div className="flex items-center gap-3 mb-2">
+            <Link href="/" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <ArrowLeft size={20} />
+            </Link>
+            <h1 className="text-xl font-semibold text-gray-900">Church</h1>
+          </div>
+        </div>
+        <div className="px-4 py-12 text-center text-gray-600">Church not found.</div>
+      </div>
+    )
+  }
+  const church = data as unknown as ChurchPublic
 
   return (
     <div className="min-h-screen bg-gray-50 pb-32">
@@ -30,7 +50,7 @@ export default async function ChurchPage({
           <Link href="/" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <ArrowLeft size={20} />
           </Link>
-          <h1 className="text-xl font-semibold text-gray-900">{data.name}</h1>
+          <h1 className="text-xl font-semibold text-gray-900">{church.name}</h1>
           <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <MoreVertical size={20} />
           </button>
@@ -49,11 +69,11 @@ export default async function ChurchPage({
       <div className="bg-white px-4 py-6">
         <div className="text-center mb-6">
           <div className="size-24 rounded-full bg-gradient-to-br from-teal-200 to-blue-300 grid place-items-center text-3xl font-bold text-slate-800 mx-auto mb-4">
-            {data.name?.charAt(0).toUpperCase() ?? "C"}
+            {church.name?.charAt(0).toUpperCase() ?? "C"}
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">{data.name}</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">{church.name}</h2>
           <p className="text-gray-600 leading-relaxed max-w-md mx-auto">
-            {data.church_summary ?? "At this church, we believe in fostering a welcoming community where everyone can find their spiritual home."}
+            {church.church_summary ?? "At this church, we believe in fostering a welcoming community where everyone can find their spiritual home."}
           </p>
         </div>
 
@@ -61,17 +81,17 @@ export default async function ChurchPage({
         <div className="flex items-center justify-center gap-2 mb-4">
           <MapPin size={16} className="text-gray-400" />
           <span className="text-sm text-gray-600">
-            {[data.locality, data.region, data.country].filter(Boolean).join(", ")}
+            {[church.locality, church.region, church.country].filter(Boolean).join(", ")}
           </span>
         </div>
         
         <div className="flex justify-center gap-2">
-          {data.belief_type && (
+          {church.belief_type && (
             <Badge variant="secondary" className="capitalize">
-              {data.belief_type.replace("_", " ")}
+              {church.belief_type.replace("_", " ")}
             </Badge>
           )}
-          {data.trinitarian_beliefs && (
+          {church.trinitarian_beliefs && (
             <Badge variant="outline">Trinitarian</Badge>
           )}
         </div>
@@ -110,8 +130,132 @@ export default async function ChurchPage({
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-4 z-50">
+      {/* Details */}
+      <div className="px-4 py-2 space-y-4">
+        {(church.instagram_url || church.youtube_url || church.scraped_email || church.church_beliefs_url) && (
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Connect</h3>
+            <div className="flex items-center gap-3">
+              {church.instagram_url && (
+                <a
+                  href={church.instagram_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Instagram"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                >
+                  <Instagram size={18} />
+                </a>
+              )}
+              {church.youtube_url && (
+                <a
+                  href={church.youtube_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="YouTube"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                >
+                  <Youtube size={18} />
+                </a>
+              )}
+              {church.scraped_email && (
+                <a
+                  href={`mailto:${church.scraped_email}`}
+                  aria-label="Email"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                >
+                  <Mail size={18} />
+                </a>
+              )}
+              {church.church_beliefs_url && (
+                <a
+                  href={church.church_beliefs_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors text-sm font-medium"
+                >
+                  Beliefs
+                  <ExternalLink size={14} />
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+
+        {church.address && (
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Address</h3>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2">
+                <MapPin size={16} className="text-gray-400 mt-1" />
+                <span className="text-gray-700">{church.address}</span>
+              </div>
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(church.address)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-green-700 hover:text-green-800 font-medium"
+              >
+                Directions →
+              </a>
+            </div>
+          </div>
+        )}
+
+        {(church.services_info || church.service_languages) && (
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Services</h3>
+            {church.services_info && (
+              <p className="text-gray-700 mb-3">{church.services_info}</p>
+            )}
+            {church.service_languages && (
+              <div className="flex flex-wrap gap-2">
+                {(
+                  Array.isArray(church.service_languages)
+                    ? church.service_languages
+                    : String(church.service_languages).split(",")
+                )
+                  .map((lang: string) => lang.trim())
+                  .filter((lang: string) => lang.length > 0)
+                  .map((lang: string, idx: number) => (
+                    <span
+                      key={`${lang}-${idx}`}
+                      className="inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-3 py-1 text-xs font-medium"
+                    >
+                      {lang}
+                    </span>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {church.programs_offered && (
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Programs</h3>
+            <div className="flex flex-wrap gap-2">
+              {(
+                Array.isArray(church.programs_offered)
+                  ? church.programs_offered
+                  : String(church.programs_offered).split(",")
+              )
+                .map((p: string) => p.trim())
+                .filter((p: string) => p.length > 0)
+                .map((program: string, idx: number) => (
+                  <span
+                    key={`${program}-${idx}`}
+                    className="inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-3 py-1 text-xs font-medium"
+                  >
+                    {program}
+                  </span>
+                ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Action Buttons (sit above persistent bottom nav) */}
+      <div className="fixed bottom-20 left-0 right-0 bg-white border-t border-gray-200 px-4 py-4 z-50">
         <div className="flex gap-3">
           <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 text-base font-medium">
             I'm Interested
@@ -122,27 +266,7 @@ export default async function ChurchPage({
         </div>
       </div>
 
-      {/* Mobile Navigation */}
-      <div className="fixed bottom-20 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 z-40">
-        <div className="flex justify-around items-center">
-          <Link href="/chat" className="flex flex-col items-center py-2 px-3 text-gray-400">
-            <div className="w-5 h-5 bg-gray-300 rounded-full"></div>
-            <span className="text-xs mt-1">Chat</span>
-          </Link>
-          <Link href="/" className="flex flex-col items-center py-2 px-3 text-green-600">
-            <div className="w-5 h-5 bg-green-600 rounded-full"></div>
-            <span className="text-xs mt-1">Explore</span>
-          </Link>
-          <Link href="/my-church" className="flex flex-col items-center py-2 px-3 text-gray-400">
-            <div className="w-5 h-5 bg-gray-300 rounded-full"></div>
-            <span className="text-xs mt-1">My Church</span>
-          </Link>
-          <Link href="/profile" className="flex flex-col items-center py-2 px-3 text-gray-400">
-            <div className="w-5 h-5 bg-gray-300 rounded-full"></div>
-            <span className="text-xs mt-1">Me</span>
-          </Link>
-        </div>
-      </div>
+      {/* Mobile Navigation provided by global layout (appears below action buttons) */}
     </div>
   )
 }

@@ -1,5 +1,4 @@
 import { User } from 'lucide-react'
-import MobileNavigation from '@/components/MobileNavigation'
 
 export default function ProfilePage() {
   return (
@@ -17,8 +16,7 @@ export default function ProfilePage() {
         <p className="text-gray-600">This feature is under development.</p>
       </div>
 
-      {/* Mobile Navigation */}
-      <MobileNavigation />
+      {/* Mobile Navigation provided by global layout */}
     </div>
   )
 }

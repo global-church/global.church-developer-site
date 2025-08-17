@@ -26,8 +26,8 @@ const LeafletMapInner = dynamic(() => import('./LeafletMapInner'), {
 
 export default function ChurchMap({
 	pins,
-	center = [39.5, -98.35],
-	zoom = 4,
+	center = [25, 10],
+	zoom = 2,
 }: {
 	pins: ChurchPin[]
 	center?: [number, number]
@@ -37,5 +37,5 @@ export default function ChurchMap({
 		<div className="h-full w-full">
 			<LeafletMapInner pins={pins} center={center} zoom={zoom} />
 		</div>
-)
+	)
 }

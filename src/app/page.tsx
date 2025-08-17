@@ -5,7 +5,6 @@ import { ChurchPublic } from "@/lib/types"
 import MobileSearch from "@/components/MobileSearch"
 import ChurchCard from "@/components/ChurchCard"
 import SectionHeader from "@/components/SectionHeader"
-import MobileNavigation from "@/components/MobileNavigation"
 import Link from "next/link"
 import { MapPin } from "lucide-react"
 
@@ -81,7 +80,7 @@ export default async function Page() {
       </div>
 
       {/* Mobile Navigation */}
-      <MobileNavigation />
+      {/* Provided by global layout */}
     </div>
   )
 }
