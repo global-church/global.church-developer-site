@@ -87,6 +87,17 @@ export default async function MapPage({
           />
         </div>
 
+        {/* Centered List Button just below search */}
+        <div className="w-full flex justify-center mb-3">
+          <Link 
+            href={sp.q ? `/search${queryString}` : '/'}
+            className="inline-flex items-center gap-2 bg-black text-white rounded-lg px-4 py-2 shadow-md hover:shadow-lg transition-shadow"
+          >
+            <List size={16} />
+            <span className="font-medium">List</span>
+          </Link>
+        </div>
+
         {/* Filter Chips */}
         {(location || belief) && (
           <div className="flex gap-2">
@@ -106,21 +117,10 @@ export default async function MapPage({
         )}
       </div>
 
-      {/* Map */}
-      <div className="pt-32 h-screen">
+      {/* Map (ensure it sits behind bottom nav) */}
+      <div className="pt-32 h-screen relative z-0">
         <ChurchMap pins={pins} />
       </div>
-
-      {/* Floating List Button */}
-      <Link 
-        href={sp.q ? `/search${queryString}` : '/'}
-        className="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-black text-white rounded-lg px-4 py-3 shadow-lg hover:shadow-xl transition-shadow z-50"
-      >
-        <div className="flex items-center gap-2 text-white font-medium">
-          <List size={16} />
-          List
-        </div>
-      </Link>
 
       {/* Mobile Navigation provided by global layout */}
     </div>

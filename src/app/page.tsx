@@ -17,7 +17,7 @@ async function getChurches(): Promise<ChurchPublic[]> {
   // Get churches ordered alphabetically by city (locality)
   const { data, error } = await supabase
     .from("church_public")
-    .select("church_id,name,locality,region,country,belief_type")
+    .select("church_id,name,locality,region,country,belief_type,service_languages")
     .not('locality', 'is', null) // Ensure locality exists
     .order("locality", { ascending: true }) // Order by city
     .limit(20) // Limit to first 20 churches

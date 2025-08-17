@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, ZoomControl } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import Link from 'next/link'
 
@@ -10,7 +10,7 @@ import Link from 'next/link'
 export default function LeafletMapInner({
 	pins,
 	center = [25, 10],
-	zoom = 2,
+	zoom = 3,
 }: {
 	pins: {
 		church_id: string
@@ -82,13 +82,27 @@ export default function LeafletMapInner({
 		createIcon()
 	}, [])
 
+	// Shared map props to prevent infinite zoom-out and vertical gray space
+	const mapProps = {
+		center,
+		zoom,
+		scrollWheelZoom: true,
+		worldCopyJump: true,
+		maxBounds: [[-85, -180] as any, [85, 180] as any],
+		maxBoundsViscosity: 1.0,
+		minZoom: 3 as any,
+		zoomSnap: 0.5 as any,
+		zoomControl: false as any,
+	}
+
 	// Don't render markers until icon is ready
 	if (!blackPinIcon) {
 		console.log('Waiting for custom icon to be created...')
 		return (
 			<div className="h-full w-full">
-				<MapContainer center={center} zoom={zoom} scrollWheelZoom worldCopyJump={true} maxBounds={[[-85, -180], [85, 180]]} maxBoundsViscosity={1.0} className="h-full w-full">
+				<MapContainer {...mapProps} className="h-full w-full">
 					<TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+					<ZoomControl position="topright" />
 				</MapContainer>
 			</div>
 		)
@@ -98,8 +112,9 @@ export default function LeafletMapInner({
 
 	return (
 		<div className="h-full w-full">
-			<MapContainer center={center} zoom={zoom} scrollWheelZoom worldCopyJump={true} maxBounds={[[-85, -180], [85, 180]]} maxBoundsViscosity={1.0} className="h-full w-full">
+			<MapContainer {...mapProps} className="h-full w-full">
 				<TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+				<ZoomControl position="topright" />
 				{pins.map((p) => (
 					<Marker 
 						key={`${p.church_id}-${blackPinIcon ? 'custom' : 'default'}`}

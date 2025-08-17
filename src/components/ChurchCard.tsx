@@ -13,6 +13,9 @@ interface ChurchCardProps {
 
 export default function ChurchCard({ church, showBookmark = true, showMapButton = false, variant = 'default' }: ChurchCardProps) {
   const location = [church.locality, church.region, church.country].filter(Boolean).join(', ')
+  const languages: string[] = Array.isArray(church.service_languages)
+    ? church.service_languages
+    : (church.service_languages ? String(church.service_languages).split(',').map(s => s.trim()).filter(Boolean) : [])
   
   if (variant === 'compact') {
     return (
@@ -23,7 +26,18 @@ export default function ChurchCard({ church, showBookmark = true, showMapButton 
               {church.name?.charAt(0).toUpperCase() ?? "C"}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-medium text-gray-900 truncate">{church.name}</div>
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="font-medium text-gray-900 truncate">{church.name}</div>
+                {languages.length > 0 && (
+                  <div className="flex items-center gap-1 flex-shrink-0 overflow-hidden">
+                    {languages.map((lang, idx) => (
+                      <span key={`${lang}-${idx}`} className="inline-flex items-center rounded-md bg-gray-100 text-gray-700 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                        {lang}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="text-sm text-gray-500 flex items-center gap-1">
                 <MapPin size={14} />
                 <span className="truncate">{location}</span>
@@ -55,7 +69,18 @@ export default function ChurchCard({ church, showBookmark = true, showMapButton 
             {church.name?.charAt(0).toUpperCase() ?? "C"}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="font-semibold text-gray-900 text-lg mb-1">{church.name}</div>
+            <div className="font-semibold text-gray-900 text-lg mb-1 flex items-center gap-2 min-w-0">
+              <span className="truncate">{church.name}</span>
+              {languages.length > 0 && (
+                <div className="flex items-center gap-1 flex-wrap">
+                  {languages.map((lang, idx) => (
+                    <span key={`${lang}-${idx}`} className="inline-flex items-center rounded-md bg-gray-100 text-gray-700 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                      {lang}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="text-sm text-gray-500 mb-2 flex items-center gap-1">
               <MapPin size={14} />
               <span>{location}</span>

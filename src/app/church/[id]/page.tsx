@@ -42,6 +42,10 @@ export default async function ChurchPage({
   }
   const church = data as unknown as ChurchPublic
 
+  const languages: string[] = Array.isArray(church.service_languages)
+    ? church.service_languages
+    : (church.service_languages ? String(church.service_languages).split(',').map(s => s.trim()).filter(Boolean) : [])
+
   return (
     <div className="min-h-screen bg-gray-50 pb-32">
       {/* Header */}
@@ -76,6 +80,17 @@ export default async function ChurchPage({
             {church.church_summary ?? "At this church, we believe in fostering a welcoming community where everyone can find their spiritual home."}
           </p>
         </div>
+
+        {/* Service Languages (centered above location) */}
+        {languages.length > 0 && (
+          <div className="flex justify-center flex-wrap gap-2 mb-3">
+            {languages.map((lang, idx) => (
+              <span key={`${lang}-${idx}`} className="inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-3 py-1 text-xs font-medium">
+                {lang}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Location and Tags */}
         <div className="flex items-center justify-center gap-2 mb-4">
