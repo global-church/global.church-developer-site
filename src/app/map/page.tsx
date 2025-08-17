@@ -25,6 +25,8 @@ type Row = {
   region: string | null
   country: string
   website: string | null
+  belief_type: string | null
+  service_languages: string[] | null
 }
 
 export default async function MapPage({
@@ -37,7 +39,7 @@ export default async function MapPage({
   // Build filtered query directly for the pins we render
   let query = supabase
     .from('church_public')
-    .select('church_id,name,latitude,longitude,locality,region,country,website')
+    .select('church_id,name,latitude,longitude,locality,region,country,website,belief_type,service_languages')
     .not('latitude', 'is', null)
     .not('longitude', 'is', null)
     .limit(500)

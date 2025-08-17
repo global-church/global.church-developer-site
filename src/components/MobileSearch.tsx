@@ -79,7 +79,7 @@ export default function MobileSearch() {
           <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
           <Input
             type="text"
-            placeholder="Search for churches"
+            placeholder="Search by name, location, or program"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyPress={handleKeyPress}

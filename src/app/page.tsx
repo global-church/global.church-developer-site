@@ -77,7 +77,7 @@ export default async function Page({
           href="/give"
           className="absolute right-4 top-4 inline-flex items-center gap-2 bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
         >
-          Support Global.Church
+          Donate
         </Link>
         <h1 className="text-2xl font-bold text-gray-900 mb-4">Global.Church Index</h1>
         

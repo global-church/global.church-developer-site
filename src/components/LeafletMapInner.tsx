@@ -22,6 +22,8 @@ export default function LeafletMapInner({
 		region: string | null
 		country: string
 		website: string | null
+		belief_type?: string | null
+		service_languages?: string[] | null
 	}[]
 	center?: [number, number]
 	zoom?: number
@@ -129,6 +131,22 @@ export default function LeafletMapInner({
 									<span className="w-2 h-2 bg-gray-400 rounded-full"></span>
 									<span>{[p.locality, p.region, p.country].filter(Boolean).join(', ')}</span>
 								</div>
+								{p.belief_type && (
+									<div className="text-xs text-gray-700 capitalize">
+										{String(p.belief_type).replace('_', ' ')}
+									</div>
+								)}
+								{Array.isArray(p.service_languages) && p.service_languages.length > 0 && (
+									p.service_languages.length === 1 ? (
+										<div className="text-xs text-gray-700">
+											<em>{p.service_languages[0]}</em>
+										</div>
+									) : (
+										<div className="text-xs text-gray-700">
+											Service Languages: {p.service_languages.join(', ')}
+										</div>
+									)
+								)}
 								<div className="flex gap-2 text-sm">
 									<Link className="text-green-600 hover:text-green-700 font-medium" href={`/church/${p.church_id}`}>
 										View Details

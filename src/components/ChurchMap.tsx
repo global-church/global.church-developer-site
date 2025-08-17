@@ -13,6 +13,8 @@ export type ChurchPin = {
 	region: string | null
 	country: string
 	website: string | null
+  belief_type?: string | null
+  service_languages?: string[] | null
 }
 
 const LeafletMapInner = dynamic(() => import('./LeafletMapInner'), { 
