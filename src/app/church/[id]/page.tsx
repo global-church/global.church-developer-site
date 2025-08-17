@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import ContentCard from "@/components/ContentCard"
 import SectionHeader from "@/components/SectionHeader"
-import { ArrowLeft, MoreVertical, MapPin, Instagram, Youtube, Mail, ExternalLink } from "lucide-react"
+import { ArrowLeft, MoreVertical, MapPin, Instagram, Youtube, Mail, ExternalLink, Phone, Facebook } from "lucide-react"
 import Link from "next/link"
 
 export const dynamic = 'force-dynamic'
@@ -44,6 +44,17 @@ export default async function ChurchPage({
   const languages: string[] = Array.isArray(church.service_languages)
     ? church.service_languages
     : (church.service_languages ? String(church.service_languages).split(',').map(s => s.trim()).filter(Boolean) : [])
+
+  // Best phone selection
+  const preferredPhone = church.church_phone?.trim() || church.phone?.trim() || null
+  const telHref = preferredPhone ? `tel:${preferredPhone.replace(/[^\d+]/g, '')}` : null
+
+  // Extract a Facebook URL from social_media if present
+  const facebookUrl = (() => {
+    const list = Array.isArray(church.social_media) ? church.social_media : []
+    const found = list.find((u) => typeof u === 'string' && /facebook\.com/i.test(u))
+    return found || null
+  })()
 
   // Parse services_info JSON string into structured lines (robust regex)
   const serviceLines = (() => {
@@ -161,35 +172,37 @@ export default async function ChurchPage({
         </div>
       </div>
 
-      {/* Recent Content */}
-      <div className="px-4 py-6">
-        <SectionHeader title="Recent" />
-        <div className="flex gap-4 overflow-x-auto pb-2">
-          <ContentCard 
-            title="Reflect and Move" 
-            href="/content/1"
-          />
-          <ContentCard 
-            title="Become Ready" 
-            href="/content/2"
-          />
-          <ContentCard 
-            title="Faith Journey" 
-            href="/content/3"
-          />
-          <ContentCard 
-            title="Community Love" 
-            href="/content/4"
-          />
+      {/* Recent Content (show only if youtube_url exists) */}
+      {church.youtube_url && (
+        <div className="px-4 py-6">
+          <SectionHeader title="Recent" />
+          <div className="flex gap-4 overflow-x-auto pb-2">
+            <ContentCard 
+              title="Reflect and Move" 
+              href="/content/1"
+            />
+            <ContentCard 
+              title="Become Ready" 
+              href="/content/2"
+            />
+            <ContentCard 
+              title="Faith Journey" 
+              href="/content/3"
+            />
+            <ContentCard 
+              title="Community Love" 
+              href="/content/4"
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Details */}
       <div className="px-4 py-2 space-y-4">
-        {(church.instagram_url || church.youtube_url || church.scraped_email || church.church_beliefs_url) && (
+        {(church.instagram_url || church.youtube_url || church.scraped_email || church.church_beliefs_url || preferredPhone || church.giving_url || facebookUrl) && (
           <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Connect</h3>
-            <div className="flex items-center gap-3">
+            <h3 className="text-sm font-medium text-gray-700 mb-3 text-center">Connect</h3>
+            <div className="flex items-center justify-center flex-wrap gap-3">
               {church.instagram_url && (
                 <a
                   href={church.instagram_url}
@@ -199,6 +212,17 @@ export default async function ChurchPage({
                   className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
                 >
                   <Instagram size={18} />
+                </a>
+              )}
+              {facebookUrl && (
+                <a
+                  href={facebookUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Facebook"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                >
+                  <Facebook size={18} />
                 </a>
               )}
               {church.youtube_url && (
@@ -221,6 +245,26 @@ export default async function ChurchPage({
                   <Mail size={18} />
                 </a>
               )}
+              {preferredPhone && telHref && (
+                <a
+                  href={telHref}
+                  aria-label="Phone"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                >
+                  <Phone size={18} />
+                </a>
+              )}
+              {church.giving_url && (
+                <a
+                  href={church.giving_url.startsWith('http') ? church.giving_url : `https://${church.giving_url}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors text-sm font-medium"
+                >
+                  Give
+                  <ExternalLink size={14} />
+                </a>
+              )}
               {church.church_beliefs_url && (
                 <a
                   href={church.church_beliefs_url}
@@ -236,51 +280,26 @@ export default async function ChurchPage({
           </div>
         )}
 
-        {(church.services_info || church.service_languages) && (
+        {serviceLines.length > 0 && (
           <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Services</h3>
-            {serviceLines.length > 0 && (
-              <div className="space-y-2">
-                {serviceLines.map((s, idx) => (
-                  <div key={`${s.language}-${s.day}-${s.time}-${idx}`} className="text-center text-gray-800">
-                    <span className="font-medium">{s.description}</span>
-                    {s.day && s.time && (
-                      <span>{` on ${s.day} @ ${s.time} `}</span>
-                    )}
-                    <em className="text-gray-500">{s.language}</em>
-                  </div>
-                ))}
-              </div>
-            )}
-            {serviceLines.length === 0 && church.services_info && (
-              <p className="text-gray-700 text-center">Service times available</p>
-            )}
-
-            {church.service_languages && (
-              <div className="mt-3 flex flex-wrap gap-2 justify-center">
-                {(
-                  Array.isArray(church.service_languages)
-                    ? church.service_languages
-                    : String(church.service_languages).split(",")
-                )
-                  .map((lang: string) => lang.trim())
-                  .filter((lang: string) => lang.length > 0)
-                  .map((lang: string, idx: number) => (
-                    <span
-                      key={`${lang}-${idx}`}
-                      className="inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-3 py-1 text-xs font-medium"
-                    >
-                      {lang}
-                    </span>
-                  ))}
-              </div>
-            )}
+            <h3 className="text-sm font-medium text-gray-700 mb-3 text-center">Services</h3>
+            <div className="space-y-2">
+              {serviceLines.map((s, idx) => (
+                <div key={`${s.language}-${s.day}-${s.time}-${idx}`} className="text-center text-gray-800">
+                  <span className="font-medium">{s.description}</span>
+                  {s.day && s.time && (
+                    <span>{` on ${s.day} @ ${s.time} `}</span>
+                  )}
+                  <em className="text-gray-500">{s.language}</em>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
         {church.address && (
           <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Address</h3>
+            <h3 className="text-sm font-medium text-gray-700 mb-2 text-center">Address</h3>
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-2">
                 <MapPin size={16} className="text-gray-400 mt-1" />
@@ -300,8 +319,8 @@ export default async function ChurchPage({
 
         {church.programs_offered && (
           <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Programs</h3>
-            <div className="flex flex-wrap gap-2">
+            <h3 className="text-sm font-medium text-gray-700 mb-3 text-center">Programs</h3>
+            <div className="flex flex-wrap gap-2 justify-center">
               {(
                 Array.isArray(church.programs_offered)
                   ? church.programs_offered
@@ -320,6 +339,25 @@ export default async function ChurchPage({
             </div>
           </div>
         )}
+
+        {/* Visit Website moved below Programs */}
+        {(() => {
+          const raw = church.website || (church as any).website_root
+          if (!raw) return null
+          const url = raw.startsWith('http') ? raw : `https://${raw}`
+          return (
+            <div className="px-2 mt-2 mb-4">
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-center bg-black text-white px-4 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+              >
+                Visit Website
+              </a>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Action Buttons (sit above persistent bottom nav) */}

@@ -53,10 +53,6 @@ export type ChurchPublic = {
   church_beliefs_url: string | null;
 
   // services info
-  /**
-   * Stored as TEXT in staging and inserted into Church as-is (JSON string like '["English: Sun 10:00 AM"]').
-   * If/when you migrate to Postgres text[] for this, change the type to string[] | null.
-   */
   services_info: string | null;
 
   /**
@@ -68,11 +64,24 @@ export type ChurchPublic = {
   instagram_url: string | null;
   youtube_url: string | null;
 
-  // scraped contact/address
+  /**
+   * Generic social media accounts (Facebook, Twitter, etc.)
+   * Postgres text[] → Supabase returns string[]
+   */
+  social_media: string[] | null;
+
+  // contact
   scraped_email: string | null;
+  phone: string | null;
+  church_phone: string | null;
+
+  // giving / donation
+  giving_url: string | null;
+
+  // scraped address
   scraped_address: string | null;
 
-  // programs (if this column exists as text[] in your table/view)
+  // programs
   programs_offered: string[] | null;
 
   // public-facing copy
