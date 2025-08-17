@@ -1,7 +1,7 @@
 // src/app/page.tsx
 import type { Metadata } from "next"
 import { supabase } from "@/lib/supabase"
-import { ChurchPublic } from "@/lib/types"
+import { ChurchPublic, BeliefType } from "@/lib/types"
 import MobileSearch from "@/components/MobileSearch"
 import ChurchCard from "@/components/ChurchCard"
 import SectionHeader from "@/components/SectionHeader"
@@ -13,12 +13,18 @@ export const metadata: Metadata = {
   description: "Find churches near you with our comprehensive directory",
 }
 
-async function getChurches(): Promise<ChurchPublic[]> {
+async function getChurches(selectedBeliefs?: BeliefType[]): Promise<ChurchPublic[]> {
   // Get churches ordered alphabetically by city (locality)
-  const { data, error } = await supabase
+  let query = supabase
     .from("church_public")
-    .select("church_id,name,locality,region,country,belief_type,service_languages")
+    .select("church_id,name,locality,region,country,belief_type,service_languages,services_info")
     .not('locality', 'is', null) // Ensure locality exists
+
+  if (selectedBeliefs && selectedBeliefs.length > 0) {
+    query = query.in('belief_type', selectedBeliefs as string[])
+  }
+
+  const { data, error } = await query
     .order("locality", { ascending: true }) // Order by city
     .limit(20) // Limit to first 20 churches
 
@@ -29,8 +35,29 @@ async function getChurches(): Promise<ChurchPublic[]> {
   return (data ?? []) as ChurchPublic[]
 }
 
-export default async function Page() {
-  const churches = await getChurches()
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ belief?: string }>
+}) {
+  const { belief } = await searchParams
+
+  const selectedBeliefs: BeliefType[] = (belief
+    ? belief
+        .split(",")
+        .map((s) => s.trim().toLowerCase())
+        .filter((s): s is BeliefType =>
+          [
+            'protestant',
+            'roman_catholic',
+            'orthodox',
+            'anglican',
+            'other',
+          ].includes(s as BeliefType)
+        )
+    : []) as BeliefType[]
+
+  const churches = await getChurches(selectedBeliefs)
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">

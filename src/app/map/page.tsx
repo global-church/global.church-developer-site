@@ -3,6 +3,7 @@ import ChurchMap from '@/components/ChurchMap'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { MapPin, Church, ArrowLeft, List } from 'lucide-react'
+import BeliefFilterButton from '@/components/BeliefFilterButton'
 
 // Shape of the querystring parameters we support on the map page
 export type SearchParams = {
@@ -40,7 +41,11 @@ export default async function MapPage({
     .limit(500)
 
   if (sp.q) query = query.ilike('name', `%${sp.q}%`)
-  if (sp.belief) query = query.eq('belief_type', sp.belief)
+  if (sp.belief) {
+    const beliefs = sp.belief.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+    if (beliefs.length === 1) query = query.eq('belief_type', beliefs[0])
+    else if (beliefs.length > 1) query = query.in('belief_type', beliefs)
+  }
   if (sp.region) query = query.ilike('region', `%${sp.region}%`)
   if (sp.country) query = query.eq('country', sp.country.toUpperCase())
 
@@ -76,14 +81,17 @@ export default async function MapPage({
           <h1 className="text-xl font-semibold text-gray-900">Global.Church Index</h1>
         </div>
         
-        {/* Search Bar */}
-        <div className="relative mb-3">
-          <input
-            type="text"
-            defaultValue={sp.q || ''}
-            placeholder="Try 'Protestant Churches Near Denver'"
-            className="w-full pl-4 pr-4 py-3 text-base border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
-          />
+        {/* Search + Filter */}
+        <div className="mb-3 flex items-stretch gap-2">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              defaultValue={sp.q || ''}
+              placeholder="Try 'Protestant Churches Near Denver'"
+              className="w-full pl-4 pr-4 py-3 text-base border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            />
+          </div>
+          <BeliefFilterButton />
         </div>
 
         {/* Centered List Button just below search */}

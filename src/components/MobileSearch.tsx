@@ -1,14 +1,41 @@
 'use client'
 
-import { Search, MapPin, Filter } from 'lucide-react'
+import { Search as SearchIcon, Filter } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+
+const BELIEF_OPTIONS = [
+  { value: 'protestant', label: 'Protestant' },
+  { value: 'roman_catholic', label: 'Roman Catholic' },
+  { value: 'orthodox', label: 'Orthodox' },
+  { value: 'anglican', label: 'Anglican' },
+  { value: 'other', label: 'Other' },
+] as const
+
+type BeliefValue = typeof BELIEF_OPTIONS[number]['value']
 
 export default function MobileSearch() {
   const [searchQuery, setSearchQuery] = useState('')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [selectedBeliefs, setSelectedBeliefs] = useState<Set<BeliefValue>>(new Set())
   const router = useRouter()
+  const sp = useSearchParams()
+
+  // Sync selected beliefs from URL
+  useEffect(() => {
+    const raw = sp.get('belief') || ''
+    const next = new Set<BeliefValue>()
+    raw.split(',').map((s) => s.trim().toLowerCase()).forEach((s) => {
+      if ((BELIEF_OPTIONS as readonly { value: string; label: string }[]).some((o) => o.value === s)) {
+        next.add(s as BeliefValue)
+      }
+    })
+    setSelectedBeliefs(next)
+  }, [sp])
+
+  const selectedCount = selectedBeliefs.size
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
@@ -22,24 +49,85 @@ export default function MobileSearch() {
     }
   }
 
+  function toggleBelief(value: BeliefValue) {
+    setSelectedBeliefs((prev) => {
+      const next = new Set(prev)
+      if (next.has(value)) next.delete(value)
+      else next.add(value)
+      return next
+    })
+  }
+
+  function applyFilters() {
+    const csv = Array.from(selectedBeliefs).join(',')
+    const url = csv ? `/?belief=${encodeURIComponent(csv)}` : '/'
+    router.push(url)
+    setFilterOpen(false)
+  }
+
+  function clearFilters() {
+    setSelectedBeliefs(new Set())
+    router.push('/')
+    setFilterOpen(false)
+  }
+
   return (
     <div className="px-4 py-3 bg-white">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-        <Input
-          type="text"
-          placeholder="Search for churches, orgs, or sermons"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyPress={handleKeyPress}
-          className="pl-10 pr-20 py-3 text-base border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
-        />
+      <div className="flex items-stretch gap-2">
+        <div className="relative flex-1">
+          <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+          <Input
+            type="text"
+            placeholder="Search for churches"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyPress={handleKeyPress}
+            className="pl-10 py-3 text-base border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          />
+        </div>
         <Button
           onClick={handleSearch}
-          className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-lg text-sm"
+          className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-lg text-sm"
         >
           Search
         </Button>
+        <div className="relative">
+          <Button
+            variant="outline"
+            onClick={() => setFilterOpen((v) => !v)}
+            className="px-3 py-1.5 text-sm"
+          >
+            <Filter size={16} className="mr-2" />
+            Filter By Type{selectedCount ? ` (${selectedCount})` : ''}
+          </Button>
+
+          {filterOpen && (
+            <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3">
+              <div className="max-h-64 overflow-auto space-y-2">
+                {BELIEF_OPTIONS.map((opt) => {
+                  const checked = selectedBeliefs.has(opt.value)
+                  const id = `belief-${opt.value}`
+                  return (
+                    <label key={opt.value} htmlFor={id} className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        id={id}
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-gray-300"
+                        checked={checked}
+                        onChange={() => toggleBelief(opt.value)}
+                      />
+                      <span className="text-sm">{opt.label}</span>
+                    </label>
+                  )
+                })}
+              </div>
+              <div className="flex justify-end gap-2 pt-3">
+                <Button variant="outline" size="sm" onClick={clearFilters}>Clear</Button>
+                <Button size="sm" onClick={applyFilters}>Apply</Button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

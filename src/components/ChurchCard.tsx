@@ -13,9 +13,26 @@ interface ChurchCardProps {
 
 export default function ChurchCard({ church, showBookmark = true, showMapButton = false, variant = 'default' }: ChurchCardProps) {
   const location = [church.locality, church.region, church.country].filter(Boolean).join(', ')
-  const languages: string[] = Array.isArray(church.service_languages)
+  let languages: string[] = Array.isArray(church.service_languages)
     ? church.service_languages
     : (church.service_languages ? String(church.service_languages).split(',').map(s => s.trim()).filter(Boolean) : [])
+
+  // Fallback: derive languages from services_info if service_languages is empty
+  if (!languages.length && church.services_info) {
+    try {
+      const parsed = JSON.parse(church.services_info)
+      const items: string[] = Array.isArray(parsed) ? parsed as string[] : (typeof parsed === 'string' ? [parsed] : [])
+      const langs = new Set<string>()
+      const re = /^\s*([^:]+):\s*/
+      for (const item of items) {
+        const m = String(item).match(re)
+        if (m && m[1]) langs.add(m[1].trim())
+      }
+      languages = Array.from(langs)
+    } catch {
+      // ignore parsing errors
+    }
+  }
   
   if (variant === 'compact') {
     return (
