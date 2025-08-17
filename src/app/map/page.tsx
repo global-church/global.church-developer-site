@@ -3,7 +3,6 @@ import ChurchMap from '@/components/ChurchMap'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { MapPin, Church, ArrowLeft, List } from 'lucide-react'
-import { notFound } from 'next/navigation'
 
 // Shape of the querystring parameters we support on the map page
 export type SearchParams = {

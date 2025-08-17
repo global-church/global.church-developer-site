@@ -273,7 +273,7 @@ export default async function ChurchPage({
       <div className="fixed bottom-20 left-0 right-0 bg-white border-t border-gray-200 px-4 py-4 z-50">
         <div className="flex gap-3">
           <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 text-base font-medium">
-            I'm Interested
+            I&apos;m Interested
           </Button>
           <Button variant="outline" className="flex-1 border-green-600 text-green-600 hover:bg-green-50 py-3 text-base font-medium">
             This is My Church

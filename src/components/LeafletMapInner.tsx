@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, ZoomControl } from 'react-leaflet'
+import type { DivIcon, LatLngBoundsExpression, Map as LeafletMap } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import Link from 'next/link'
 
@@ -25,7 +26,7 @@ export default function LeafletMapInner({
 	center?: [number, number]
 	zoom?: number
 }) {
-	const [blackPinIcon, setBlackPinIcon] = useState<any>(null)
+	const [blackPinIcon, setBlackPinIcon] = useState<DivIcon | null>(null)
 
 	useEffect(() => {
 		// Create the black pin icon after component mounts
@@ -88,11 +89,11 @@ export default function LeafletMapInner({
 		zoom,
 		scrollWheelZoom: true,
 		worldCopyJump: true,
-		maxBounds: [[-85, -180] as any, [85, 180] as any],
-		maxBoundsViscosity: 1.0,
-		minZoom: 3 as any,
-		zoomSnap: 0.5 as any,
-		zoomControl: false as any,
+		maxBounds: [[-85, -180], [85, 180]] as LatLngBoundsExpression,
+		maxBoundsViscosity: 1.0 as number,
+		minZoom: 3 as number,
+		zoomSnap: 0.5 as number,
+		zoomControl: false as boolean,
 	}
 
 	// Don't render markers until icon is ready
