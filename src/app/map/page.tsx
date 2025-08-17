@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { MapPin, Church, ArrowLeft, List } from 'lucide-react'
 import BeliefFilterButton from '@/components/BeliefFilterButton'
+import LanguageFilterButton from '@/components/LanguageFilterButton'
 
 // Shape of the querystring parameters we support on the map page
 export type SearchParams = {
@@ -11,6 +12,7 @@ export type SearchParams = {
   belief?: string
   region?: string
   country?: string
+  language?: string
 }
 
 // Row subset needed for map pins
@@ -45,6 +47,10 @@ export default async function MapPage({
     const beliefs = sp.belief.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
     if (beliefs.length === 1) query = query.eq('belief_type', beliefs[0])
     else if (beliefs.length > 1) query = query.in('belief_type', beliefs)
+  }
+  if (sp.language) {
+    const languages = sp.language.split(',').map((s) => s.trim()).filter(Boolean)
+    if (languages.length > 0) query = query.overlaps('service_languages', languages)
   }
   if (sp.region) query = query.ilike('region', `%${sp.region}%`)
   if (sp.country) query = query.eq('country', sp.country.toUpperCase())
@@ -81,28 +87,10 @@ export default async function MapPage({
           <h1 className="text-xl font-semibold text-gray-900">Global.Church Index</h1>
         </div>
         
-        {/* Search + Filter */}
-        <div className="mb-3 flex items-stretch gap-2">
-          <div className="relative flex-1">
-            <input
-              type="text"
-              defaultValue={sp.q || ''}
-              placeholder="Try 'Protestant Churches Near Denver'"
-              className="w-full pl-4 pr-4 py-3 text-base border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            />
-          </div>
+        {/* Centered filter buttons */}
+        <div className="w-full flex justify-center gap-2 mb-3">
           <BeliefFilterButton />
-        </div>
-
-        {/* Centered List Button just below search */}
-        <div className="w-full flex justify-center mb-3">
-          <Link 
-            href={sp.q ? `/search${queryString}` : '/'}
-            className="inline-flex items-center gap-2 bg-black text-white rounded-lg px-4 py-2 shadow-md hover:shadow-lg transition-shadow"
-          >
-            <List size={16} />
-            <span className="font-medium">List</span>
-          </Link>
+          <LanguageFilterButton />
         </div>
 
         {/* Filter Chips */}
@@ -125,8 +113,19 @@ export default async function MapPage({
       </div>
 
       {/* Map (ensure it sits behind bottom nav) */}
-      <div className="pt-32 h-screen relative z-0">
+      <div className="pt-28 h-screen relative z-0">
         <ChurchMap pins={pins} />
+      </div>
+
+      {/* Bottom overlay List View button above bottom navigation */}
+      <div className="fixed bottom-20 left-0 right-0 z-40 flex justify-center px-4">
+        <Link 
+          href={sp.q ? `/search${queryString}` : '/'}
+          className="inline-flex items-center gap-2 bg-black text-white rounded-lg px-4 py-2 shadow-md hover:shadow-lg transition-shadow"
+        >
+          <List size={16} />
+          <span className="font-medium">List View</span>
+        </Link>
       </div>
 
       {/* Mobile Navigation provided by global layout */}

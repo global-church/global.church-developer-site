@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   description: "Find churches near you with our comprehensive directory",
 }
 
-async function getChurches(selectedBeliefs?: BeliefType[]): Promise<ChurchPublic[]> {
+async function getChurches(selectedBeliefs?: BeliefType[], selectedLanguages?: string[]): Promise<ChurchPublic[]> {
   // Get churches ordered alphabetically by city (locality)
   let query = supabase
     .from("church_public")
@@ -22,6 +22,9 @@ async function getChurches(selectedBeliefs?: BeliefType[]): Promise<ChurchPublic
 
   if (selectedBeliefs && selectedBeliefs.length > 0) {
     query = query.in('belief_type', selectedBeliefs as string[])
+  }
+  if (selectedLanguages && selectedLanguages.length > 0) {
+    query = query.overlaps('service_languages', selectedLanguages)
   }
 
   const { data, error } = await query
@@ -38,9 +41,9 @@ async function getChurches(selectedBeliefs?: BeliefType[]): Promise<ChurchPublic
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ belief?: string }>
+  searchParams: Promise<{ belief?: string; language?: string }>
 }) {
-  const { belief } = await searchParams
+  const { belief, language } = await searchParams
 
   const selectedBeliefs: BeliefType[] = (belief
     ? belief
@@ -57,7 +60,14 @@ export default async function Page({
         )
     : []) as BeliefType[]
 
-  const churches = await getChurches(selectedBeliefs)
+  const selectedLanguages: string[] = (language
+    ? language
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
+    : [])
+
+  const churches = await getChurches(selectedBeliefs, selectedLanguages)
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">

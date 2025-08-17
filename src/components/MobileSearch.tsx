@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import LanguageFilterButton from '@/components/LanguageFilterButton'
 
 const BELIEF_OPTIONS = [
   { value: 'protestant', label: 'Protestant' },
@@ -128,6 +129,7 @@ export default function MobileSearch() {
             </div>
           )}
         </div>
+        <LanguageFilterButton />
       </div>
     </div>
   )
