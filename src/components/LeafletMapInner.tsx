@@ -258,7 +258,7 @@ export default function LeafletMapInner({
 		maxBounds: [[-85, -180], [85, 180]] as LatLngBoundsExpression,
 		maxBoundsViscosity: 1.0 as number,
 		minZoom: 3 as number,
-		zoomSnap: 0.5 as number,
+		zoomSnap: 1 as number,
 		zoomControl: false as boolean,
 		zoomAnimation: false as boolean,
 		fadeAnimation: false as boolean,
