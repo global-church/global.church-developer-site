@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 
 interface ContentCardProps {
   title: string
@@ -14,12 +15,15 @@ export default function ContentCard({ title, imageUrl, href, variant = 'default'
   
   return (
     <Link href={href} className="block flex-shrink-0">
-      <div className={`${size} rounded-xl bg-gradient-to-br from-teal-200 to-blue-300 flex items-center justify-center text-white font-semibold text-lg shadow-sm hover:shadow-md transition-shadow`}>
+      <div className={`${size} relative rounded-xl bg-gradient-to-br from-teal-200 to-blue-300 flex items-center justify-center text-white font-semibold text-lg shadow-sm hover:shadow-md transition-shadow`}>
         {imageUrl ? (
-          <img 
+          <Image 
             src={imageUrl} 
             alt={title}
-            className="w-full h-full object-cover rounded-xl"
+            fill
+            className="object-cover rounded-xl"
+            sizes="(max-width: 640px) 12rem, 16rem"
+            priority={false}
           />
         ) : (
           <span className="text-slate-700">{title.charAt(0)}</span>

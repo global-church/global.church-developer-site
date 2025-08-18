@@ -295,7 +295,7 @@ export default async function ChurchPage({
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <h3 className="text-sm font-medium text-gray-700 mb-3 text-center">Services</h3>
             <div className="space-y-2">
-              {serviceLines.map((s, idx) => (
+              {serviceLines.slice(0, 10).map((s, idx) => (
                 <div key={`${s.language}-${s.day}-${s.time}-${idx}`} className="text-center text-gray-800">
                   <span className="font-medium">{s.description}</span>
                   {s.day && s.time && (

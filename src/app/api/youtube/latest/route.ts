@@ -57,7 +57,8 @@ export async function GET(req: Request) {
     // edge cache: 5 minutes fresh, 5 minutes stale-while-revalidate
     resp.headers.set('Cache-Control', 's-maxage=300, stale-while-revalidate=300');
     return resp;
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? 'Unknown error' }, { status: 500 });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

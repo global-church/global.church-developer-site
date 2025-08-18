@@ -11,11 +11,21 @@ import { supabase } from '@/lib/supabase'
 
 // ChurchPin type is now defined in ChurchMap.tsx
 
+// Linear scale helpers for icons (module scope to avoid hook deps warnings)
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value))
+}
+function interpolateSize(zoom: number, minZoom: number, maxZoom: number, minSize: number, maxSize: number) {
+  const z = clamp(zoom, minZoom, maxZoom)
+  const t = (z - minZoom) / (maxZoom - minZoom)
+  return Math.round(minSize + t * (maxSize - minSize))
+}
+
 export default function LeafletMapInner({
 	pins,
 	center = [25, 10],
 	zoom = 3,
-	filters,
+	filters: _filters,
 }: {
 	pins: {
 		church_id: string
@@ -42,15 +52,7 @@ export default function LeafletMapInner({
   const debounceTimerRef = useRef<number | null>(null)
   const requestIdRef = useRef<number>(0)
 
-  // Linear scale helpers for icons
-  function clamp(value: number, min: number, max: number) {
-    return Math.max(min, Math.min(max, value))
-  }
-  function interpolateSize(zoom: number, minZoom: number, maxZoom: number, minSize: number, maxSize: number) {
-    const z = clamp(zoom, minZoom, maxZoom)
-    const t = (z - minZoom) / (maxZoom - minZoom)
-    return Math.round(minSize + t * (maxSize - minSize))
-  }
+  // Linear scale helpers are defined at module scope
 
   type ChurchPointProps = {
     church_id: string

@@ -3,6 +3,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 type VideoItem = {
   videoId: string;
@@ -16,17 +17,32 @@ type VideoItem = {
 export default function YouTubeLatest({ youtubeUrl, max = 6 }: { youtubeUrl: string; max?: number }) {
   const [items, setItems] = useState<VideoItem[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [fallbackMap, setFallbackMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const res = await fetch(`/api/youtube/latest?youtube_url=${encodeURIComponent(youtubeUrl)}&max=${max}`, { cache: 'no-store' });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || 'Failed to load videos');
-        if (!cancelled) setItems(data.items);
-      } catch (e: any) {
-        if (!cancelled) setErr(e.message);
+        const data: unknown = await res.json();
+        if (!res.ok) {
+          const errorMessage = (() => {
+            if (
+              typeof data === 'object' &&
+              data !== null &&
+              'error' in (data as Record<string, unknown>) &&
+              typeof (data as { error?: unknown }).error === 'string'
+            ) {
+              return (data as { error: string }).error;
+            }
+            return 'Failed to load videos';
+          })();
+          throw new Error(errorMessage);
+        }
+        if (!cancelled) setItems((data as { items: VideoItem[] }).items);
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : 'Unknown error';
+        if (!cancelled) setErr(message);
       }
     })();
     return () => { cancelled = true; };
@@ -46,13 +62,15 @@ export default function YouTubeLatest({ youtubeUrl, max = 6 }: { youtubeUrl: str
           rel="noreferrer"
           className="group rounded-2xl overflow-hidden shadow hover:shadow-lg transition"
         >
-          <div className="aspect-video bg-black">
-            <img
-              src={v.thumbnail}
+          <div className="aspect-video bg-black relative">
+            <Image
+              src={fallbackMap[v.videoId] ? v.thumbnailFallback : v.thumbnail}
               alt={v.title}
-              loading="lazy"
-              className="w-full h-full object-cover"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).src = v.thumbnailFallback; }}
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
+              className="object-cover"
+              onError={() => setFallbackMap((m) => ({ ...m, [v.videoId]: true }))}
+              priority={false}
             />
           </div>
           <div className="p-3">
