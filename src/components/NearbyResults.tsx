@@ -18,7 +18,7 @@ export default function NearbyResults() {
         const radiusForRpcKm = unit === "km" ? radiusKm : radiusKm * 1.60934;
         const data = await fetchNearbyChurches(lat, lng, radiusForRpcKm, 50);
         setResults(data);
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error(e);
         alert("Sorry, we couldn’t load nearby churches.");
       } finally {
@@ -35,20 +35,19 @@ export default function NearbyResults() {
   };
 
   // Prefer the RPC's service_languages (string[]) but retain a light fallback to services_info if present.
-  const extractLanguages = (church: NearbyChurch): string[] => {
-    if (Array.isArray((church as any).service_languages)) {
-      // Normalize to title case-ish for nicer badges
-      return ((church as any).service_languages as string[])
-        .map((s) => String(s).trim())
-        .filter(Boolean);
-    }
+  const extractLanguages = (church: NearbyChurch & { services_info?: string | null }): string[] => {
+    const langsFromRpc: string[] = Array.isArray(church.service_languages)
+      ? church.service_languages.map((s) => String(s).trim()).filter(Boolean)
+      : [];
+
+    if (langsFromRpc.length > 0) return langsFromRpc;
 
     // Fallback for older data shape where services_info may exist and contain "English: ..." etc.
-    if ((church as any).services_info) {
+    if (typeof church.services_info === "string" && church.services_info.length > 0) {
       try {
-        const parsed = JSON.parse((church as any).services_info as string);
+        const parsed = JSON.parse(church.services_info);
         const items: string[] = Array.isArray(parsed)
-          ? (parsed as string[])
+          ? parsed.map((v) => String(v))
           : typeof parsed === "string"
           ? [parsed]
           : [];
@@ -67,7 +66,7 @@ export default function NearbyResults() {
     return [];
   };
 
-  const formatBelief = (belief?: string | null) => {
+  const formatBelief = (belief?: NearbyChurch['belief_type'] | null) => {
     if (!belief) return null;
     // Pretty-print values like "roman_catholic" -> "Roman Catholic"
     return belief
@@ -113,7 +112,7 @@ export default function NearbyResults() {
       <ul className="space-y-3">
         {results.map((r) => {
           const languages = extractLanguages(r);
-          const beliefPretty = formatBelief((r as any).belief_type);
+          const beliefPretty = formatBelief(r.belief_type ?? null);
           return (
             <li key={r.church_id} className="rounded-xl border">
               <a href={`/church/${r.church_id}`} className="block p-4 group">
