@@ -51,6 +51,27 @@ export default async function ChurchPage({
   const preferredPhone = church.church_phone?.trim() || church.phone?.trim() || null
   const telHref = preferredPhone ? `tel:${preferredPhone.replace(/[^\d+]/g, '')}` : null
 
+  // Build full address (omit null/"NULL") and directions link
+  const isValidPart = (p?: string | null) => !!p && String(p).trim().length > 0 && String(p).toLowerCase() !== 'null'
+  const addressLine1 = isValidPart(church.address) ? String(church.address).trim() : ''
+  const addressLine2 = [church.locality, church.region, church.postal_code, church.country]
+    .filter(isValidPart)
+    .join(', ')
+  const fullAddress = [addressLine1, addressLine2].filter(Boolean).join(', ')
+  const directionsHref = (() => {
+    if (fullAddress.length > 0) {
+      return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(fullAddress)}`
+    }
+    if (church.latitude && church.longitude) {
+      return `https://www.google.com/maps/dir/?api=1&destination=${church.latitude},${church.longitude}`
+    }
+    const namePlusLoc = [church.name, church.locality, church.region, church.country].filter(isValidPart).join(', ')
+    if (namePlusLoc.length > 0) {
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(namePlusLoc)}`
+    }
+    return null
+  })()
+
   // Extract a Facebook URL from social_media if present
   const facebookUrl = (() => {
     const list = Array.isArray(church.social_media) ? church.social_media : []
@@ -158,7 +179,9 @@ export default async function ChurchPage({
         <div className="flex items-center justify-center gap-2 mb-4">
           <MapPin size={16} className="text-gray-400" />
           <span className="text-sm text-gray-600">
-            {[church.locality, church.region, church.country].filter(Boolean).join(", ")}
+            {[church.locality, church.region, church.country]
+              .filter((part) => part && String(part).toLowerCase() !== 'null')
+              .join(", ")}
           </span>
         </div>
         
@@ -299,22 +322,27 @@ export default async function ChurchPage({
           </div>
         )}
 
-        {church.address && (
+        {(addressLine1 || addressLine2) && (
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <h3 className="text-sm font-medium text-gray-700 mb-2 text-center">Address</h3>
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-2">
-                <MapPin size={16} className="text-gray-400 mt-1" />
-                <span className="text-gray-700">{church.address}</span>
-              </div>
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(church.address)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-green-700 hover:text-green-800 font-medium"
-              >
-                Directions →
-              </a>
+            <div className="text-center">
+              <MapPin size={16} className="text-gray-400 mx-auto mb-1" />
+              {addressLine1 && (
+                <div className="text-gray-800">{addressLine1}</div>
+              )}
+              {addressLine2 && (
+                <div className="text-gray-600">{addressLine2}</div>
+              )}
+              {directionsHref && (
+                <a
+                  href={directionsHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-block text-sm text-green-700 hover:text-green-800 font-medium"
+                >
+                  Directions →
+                </a>
+              )}
             </div>
           </div>
         )}

@@ -79,7 +79,7 @@ async function searchChurches(query: string, selectedBeliefs: BeliefType[], sele
           (contains(row.name) ? 1.0 : 0) +
           (contains(row.church_summary || undefined) ? 0.5 : 0) +
           (contains(row.locality) ? 0.4 : 0) +
-          (contains(row.region) ? 0.3 : 0) +
+          (contains(row.region && row.region.toLowerCase() !== 'null' ? row.region : '') ? 0.3 : 0) +
           (contains(row.country) ? 0.2 : 0)
         return { row, score }
       })

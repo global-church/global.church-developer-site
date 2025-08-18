@@ -12,7 +12,9 @@ interface ChurchCardProps {
 }
 
 export default function ChurchCard({ church, showBookmark = true, showMapButton = false, variant = 'default' }: ChurchCardProps) {
-  const location = [church.locality, church.region, church.country].filter(Boolean).join(', ')
+  const location = [church.locality, church.region, church.country]
+    .filter((part) => part && String(part).toLowerCase() !== 'null')
+    .join(', ')
   let languages: string[] = Array.isArray(church.service_languages)
     ? church.service_languages
     : (church.service_languages ? String(church.service_languages).split(',').map(s => s.trim()).filter(Boolean) : [])
