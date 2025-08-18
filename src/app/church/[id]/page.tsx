@@ -4,6 +4,8 @@ import { ChurchPublic } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import YouTubeLatest from "@/components/YouTubeLatest"
+import { getFacebookPageUrl } from "@/lib/facebook"
+import FacebookSection from "@/components/FacebookSection"
 import { getChannelIdFromAnyYouTubeUrl } from "@/lib/resolveChannelId"
 import { ArrowLeft, MoreVertical, MapPin, Instagram, Youtube, Mail, ExternalLink, Phone, Facebook } from "lucide-react"
 import Link from "next/link"
@@ -96,12 +98,8 @@ export default async function ChurchPage({
     ? `https://www.google.com/maps/embed/v1/place?key=${mapsApiKey}&q=${encodeURIComponent(mapQuery)}&zoom=15`
     : null
 
-  // Extract a Facebook URL from social_media if present
-  const facebookUrl = (() => {
-    const list = Array.isArray(church.social_media) ? church.social_media : []
-    const found = list.find((u) => typeof u === 'string' && /facebook\.com/i.test(u))
-    return found || null
-  })()
+  // Extract Facebook Page URL server-side to keep client lean
+  const fbUrl = getFacebookPageUrl(church.social_media)
 
   // Parse services_info JSON string into structured lines (robust regex)
   const serviceLines = (() => {
@@ -163,7 +161,7 @@ export default async function ChurchPage({
   // Determine if Connect has at least one actionable button
   const hasConnect: boolean = Boolean(
     church.instagram_url ||
-    facebookUrl ||
+    fbUrl ||
     hasValidYouTube ||
     church.scraped_email ||
     (preferredPhone && telHref) ||
@@ -289,9 +287,9 @@ export default async function ChurchPage({
                   <Instagram size={18} />
                 </a>
               )}
-              {facebookUrl && (
+              {fbUrl && (
                 <a
-                  href={facebookUrl}
+                  href={fbUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Facebook"
@@ -361,6 +359,9 @@ export default async function ChurchPage({
             <YouTubeLatest youtubeUrl={church.youtube_url as string} max={6} />
           </div>
         )}
+
+        {/* Facebook (below YouTube) - temporarily always shown */}
+        <FacebookSection fbUrl={fbUrl} />
 
         {(addressLine1 || addressLine2) && (
           <div className="bg-white rounded-xl border border-gray-200 p-4">
