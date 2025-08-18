@@ -1,12 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, ZoomControl, useMap } from 'react-leaflet'
 import Supercluster from 'supercluster'
 import type { DivIcon, LatLngBoundsExpression } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import Link from 'next/link'
 import * as GeoJSON from 'geojson'
+import { supabase } from '@/lib/supabase'
 
 // ChurchPin type is now defined in ChurchMap.tsx
 
@@ -14,6 +15,7 @@ export default function LeafletMapInner({
 	pins,
 	center = [25, 10],
 	zoom = 3,
+	filters,
 }: {
 	pins: {
 		church_id: string
@@ -26,14 +28,19 @@ export default function LeafletMapInner({
 		website: string | null
 		belief_type?: string | null
 		service_languages?: string[] | null
+		geojson?: { type: 'Point'; coordinates: [number, number] } | null
 	}[]
 	center?: [number, number]
 	zoom?: number
+	filters?: { q?: string; belief?: string; region?: string; country?: string; language?: string }
 }) {
 	const [blackPinIcon, setBlackPinIcon] = useState<DivIcon | null>(null)
   const [clusterIndex, setClusterIndex] = useState<Supercluster | null>(null)
   const [bounds, setBounds] = useState<[[number, number], [number, number]] | null>(null)
   const [zoomLevel, setZoomLevel] = useState<number>(3)
+  const [pinsState, setPinsState] = useState<typeof pins>(pins)
+  const debounceTimerRef = useRef<number | null>(null)
+  const requestIdRef = useRef<number>(0)
 
   // Linear scale helpers for icons
   function clamp(value: number, min: number, max: number) {
@@ -56,6 +63,7 @@ export default function LeafletMapInner({
     website: string | null
     belief_type?: string | null
     service_languages?: string[] | null
+    geojson?: { type: 'Point'; coordinates: [number, number] } | null
   }
 
   // Cluster marker with smooth flyTo animation
@@ -207,18 +215,21 @@ export default function LeafletMapInner({
     updateIcon()
   }, [zoomLevel])
 
-  // Build Supercluster index when pins change
+  // Build Supercluster index when pins change (prefer geojson when present)
   useEffect(() => {
-    const features: FeaturePoint[] = pins.map((p) => ({
-      type: 'Feature',
-      properties: { cluster: false, church_id: p.church_id, point: p },
-      geometry: { type: 'Point', coordinates: [p.longitude, p.latitude] },
-    }))
+    const features: FeaturePoint[] = pinsState.map((p) => {
+      const coords = p.geojson?.coordinates || [p.longitude, p.latitude]
+      return {
+        type: 'Feature',
+        properties: { cluster: false, church_id: p.church_id, point: p },
+        geometry: { type: 'Point', coordinates: coords as [number, number] },
+      }
+    })
     const index = new Supercluster({ radius: 60, maxZoom: 16 })
     // Supercluster typings expect GeoJSON.Feature[]; cast safely
-    index.load(features as unknown as GeoJSON.Feature<GeoJSON.Point, { [key: string]: unknown }>[]) 
+    ;(index as unknown as { load: (features: unknown[]) => void }).load(features as unknown[])
     setClusterIndex(index)
-  }, [pins])
+  }, [pinsState])
 
   const handleMapChange = useCallback((map: ReturnType<typeof useMap>, padding = 0.75) => {
     const b = map.getBounds()
@@ -233,6 +244,89 @@ export default function LeafletMapInner({
     })
     setZoomLevel((prev) => (Math.abs(prev - nextZoom) <= 1e-3 ? prev : nextZoom))
   }, [])
+
+  // Debounced viewport fetch using public RPC churches_in_bbox
+  useEffect(() => {
+    if (!bounds) return
+
+    // Compute spans and skip overly large bboxes
+    const [minLng, minLat] = bounds[0]
+    const [maxLng, maxLat] = bounds[1]
+    const spanLng = Math.abs(maxLng - minLng)
+    const spanLat = Math.abs(maxLat - minLat)
+    if (spanLng > 15 || spanLat > 15) {
+      return
+    }
+
+    // Debounce
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+      debounceTimerRef.current = null
+    }
+    debounceTimerRef.current = window.setTimeout(async () => {
+      const reqId = ++requestIdRef.current
+      try {
+        // Ensure numeric params
+        const p_min_lng = Number(minLng)
+        const p_min_lat = Number(minLat)
+        const p_max_lng = Number(maxLng)
+        const p_max_lat = Number(maxLat)
+        if (!Number.isFinite(p_min_lng) || !Number.isFinite(p_min_lat) || !Number.isFinite(p_max_lng) || !Number.isFinite(p_max_lat)) {
+          return
+        }
+        const { data, error } = await supabase.rpc('churches_in_bbox', {
+          p_min_lng,
+          p_min_lat,
+          p_max_lng,
+          p_max_lat,
+          p_limit: 500,
+        })
+        // Guard against stale responses
+        if (reqId !== requestIdRef.current) return
+
+        if (error) {
+          console.error('fetchChurchesInBBox error:', error)
+          return
+        }
+        const rows = (data ?? []) as Array<{
+          church_id: string
+          name: string
+          latitude: number | null
+          longitude: number | null
+          locality: string | null
+          region: string | null
+          country: string
+          website: string | null
+          belief_type?: string | null
+          service_languages?: string[] | null
+          geojson?: { type: 'Point'; coordinates: [number, number] } | null
+        }>
+        const nextPins = rows
+          .map((r) => {
+            const [lng, lat] = r.geojson?.coordinates ?? [r.longitude, r.latitude]
+            return {
+              ...r,
+              latitude: lat as number | null,
+              longitude: lng as number | null,
+            }
+          })
+          .filter((r) => typeof r.latitude === 'number' && typeof r.longitude === 'number') as typeof pins
+        setPinsState(nextPins)
+      } catch (err) {
+        // Log actual error object
+        console.error('fetchChurchesInBBox exception:', err)
+      }
+    }, 400)
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+        debounceTimerRef.current = null
+      }
+      // Increment requestId to invalidate any pending resolution
+      requestIdRef.current += 1
+    }
+  }, [bounds])
 
   function MapStateSyncCore({ onChange, padding = 0.75 }: { onChange: (map: ReturnType<typeof useMap>, padding?: number) => void; padding?: number }) {
     const map = useMap()
@@ -277,7 +371,7 @@ export default function LeafletMapInner({
 		)
 	}
 
-	console.log('Rendering markers with custom icon:', blackPinIcon, 'Total pins:', pins.length)
+	console.log('Rendering markers with custom icon:', blackPinIcon, 'Total pins:', pinsState.length)
 
 	return (
 		<div className="h-full w-full">

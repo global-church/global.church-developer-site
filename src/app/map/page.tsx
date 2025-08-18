@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import ChurchMap from '@/components/ChurchMap'
+import type { ChurchPublic } from '@/lib/types'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { MapPin, Church, ArrowLeft, List } from 'lucide-react'
@@ -15,19 +16,21 @@ export type SearchParams = {
   language?: string
 }
 
-// Row subset needed for map pins
-type Row = {
-  church_id: string
-  name: string
-  latitude: number | null
-  longitude: number | null
-  locality: string | null
-  region: string | null
-  country: string
-  website: string | null
-  belief_type: string | null
-  service_languages: string[] | null
-}
+// Row subset needed for map pins (prefer geojson)
+type Row = Pick<
+  ChurchPublic,
+  | 'church_id'
+  | 'name'
+  | 'latitude'
+  | 'longitude'
+  | 'locality'
+  | 'region'
+  | 'country'
+  | 'website'
+  | 'belief_type'
+  | 'service_languages'
+  | 'geojson'
+>
 
 export default async function MapPage({
   searchParams,
@@ -36,12 +39,10 @@ export default async function MapPage({
 }) {
   const sp: SearchParams = await searchParams
 
-  // Build filtered query directly for the pins we render
+  // Build filtered query directly for the pins we render (include geojson)
   let query = supabase
     .from('church_public')
-    .select('church_id,name,latitude,longitude,locality,region,country,website,belief_type,service_languages')
-    .not('latitude', 'is', null)
-    .not('longitude', 'is', null)
+    .select('church_id,name,latitude,longitude,locality,region,country,website,belief_type,service_languages,geojson')
     .limit(500)
 
   if (sp.q) query = query.ilike('name', `%${sp.q}%`)
@@ -61,8 +62,13 @@ export default async function MapPage({
   if (error) console.error(error)
 
   const pins = (data as Row[])
-    .filter((r) => typeof r.latitude === 'number' && typeof r.longitude === 'number')
-    .map((r) => ({ ...r, latitude: r.latitude!, longitude: r.longitude! }))
+    .filter((r) => (r.geojson && Array.isArray(r.geojson.coordinates)) || (typeof r.latitude === 'number' && typeof r.longitude === 'number'))
+    .map((r) => ({
+      ...r,
+      // Ensure numeric lat/lng values for components that still expect them
+      latitude: typeof r.latitude === 'number' ? r.latitude : (r.geojson ? r.geojson.coordinates[1] : null)!,
+      longitude: typeof r.longitude === 'number' ? r.longitude : (r.geojson ? r.geojson.coordinates[0] : null)!,
+    }))
 
   // Build a safe querystring for the back-link without using `any`
   const queryString = (() => {
@@ -116,7 +122,7 @@ export default async function MapPage({
 
       {/* Map (ensure it sits behind bottom nav) */}
       <div className="pt-28 h-screen relative z-0">
-        <ChurchMap pins={pins} />
+        <ChurchMap pins={pins} filters={sp} />
       </div>
 
       {/* Bottom overlay List View button above bottom navigation */}

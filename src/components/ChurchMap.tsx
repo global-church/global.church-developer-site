@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import type { ComponentType } from 'react'
+import type { GeoJSONPoint } from '@/lib/types'
 
 // Define the ChurchPin type locally to avoid import issues
 export type ChurchPin = {
@@ -15,6 +16,7 @@ export type ChurchPin = {
 	website: string | null
   belief_type?: string | null
   service_languages?: string[] | null
+  geojson?: GeoJSONPoint | null
 }
 
 const LeafletMapInner = dynamic(() => import('./LeafletMapInner'), { 
@@ -24,20 +26,23 @@ const LeafletMapInner = dynamic(() => import('./LeafletMapInner'), {
 	pins: ChurchPin[]
 	center?: [number, number]
 	zoom?: number
+	filters?: { q?: string; belief?: string; region?: string; country?: string; language?: string }
 }>
 
 export default function ChurchMap({
 	pins,
 	center = [25, 10],
 	zoom = 2,
+	filters,
 }: {
 	pins: ChurchPin[]
 	center?: [number, number]
 	zoom?: number
+	filters?: { q?: string; belief?: string; region?: string; country?: string; language?: string }
 }) {
 	return (
 		<div className="h-full w-full">
-			<LeafletMapInner pins={pins} center={center} zoom={zoom} />
+			<LeafletMapInner pins={pins} center={center} zoom={zoom} filters={filters} />
 		</div>
 	)
 }

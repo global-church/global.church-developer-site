@@ -24,6 +24,12 @@ export type PipelineStatus =
   | 'non_christian_terms'
   | 'gers_id_already_in_db';
 
+/** Minimal GeoJSON Point for map libs (lng, lat) */
+export type GeoJSONPoint = {
+  type: 'Point';
+  coordinates: [number, number]; // [lng, lat]
+};
+
 export type ChurchPublic = {
   // core ids / names
   church_id: string;
@@ -31,8 +37,8 @@ export type ChurchPublic = {
   name: string;
 
   // location
-  latitude: number | null;
-  longitude: number | null;
+  latitude: number | null; // double precision
+  longitude: number | null; // double precision
   address: string | null;
   locality: string | null;
   region: string | null;
@@ -44,20 +50,18 @@ export type ChurchPublic = {
   website_root: string | null;
 
   // internal/search-ish
-  pipeline_status: PipelineStatus | null;
+  pipeline_status: PipelineStatus | null; // stored as text in DB
   search_blob: string | null;
 
   // beliefs / classification
-  belief_type: BeliefType | null;
+  belief_type: BeliefType | null; // enum in app, enum type in DB
   trinitarian_beliefs: boolean | null;
   church_beliefs_url: string | null;
 
   // services info
   services_info: string | null;
 
-  /**
-   * Postgres text[] → Supabase client returns string[]
-   */
+  /** Postgres text[] → Supabase returns string[] */
   service_languages: string[] | null;
 
   // socials
@@ -65,7 +69,7 @@ export type ChurchPublic = {
   youtube_url: string | null;
 
   /**
-   * Generic social media accounts (Facebook, Twitter, etc.)
+   * Generic social media accounts (Facebook, etc.)
    * Postgres text[] → Supabase returns string[]
    */
   social_media: string[] | null;
@@ -86,4 +90,19 @@ export type ChurchPublic = {
 
   // public-facing copy
   church_summary: string | null;
+
+  // spatial (from view)
+  /** Raw PostGIS geography WKB (you can ignore this in FE) */
+  geo: string | null;
+
+  /** Handy for maps: { type: 'Point', coordinates: [lng, lat] } */
+  geojson: GeoJSONPoint | null;
+};
+
+/**
+ * RPC: churches_within_radius returns all ChurchPublic columns + distance_m
+ * (distance in meters from the query point)
+ */
+export type ChurchWithinRadiusRow = ChurchPublic & {
+  distance_m: number;
 };
