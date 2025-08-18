@@ -3,8 +3,7 @@ import { supabase } from "@/lib/supabase"
 import { ChurchPublic } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import ContentCard from "@/components/ContentCard"
-import SectionHeader from "@/components/SectionHeader"
+import YouTubeLatest from "@/components/YouTubeLatest"
 import { ArrowLeft, MoreVertical, MapPin, Instagram, Youtube, Mail, ExternalLink, Phone, Facebook } from "lucide-react"
 import Link from "next/link"
 
@@ -197,28 +196,15 @@ export default async function ChurchPage({
         </div>
       </div>
 
-      {/* Recent Content (show only if youtube_url exists) */}
+      {/* Recent Videos (YouTube) */}
       {church.youtube_url && (
         <div className="px-4 py-6">
-          <SectionHeader title="Recent" />
-          <div className="flex gap-4 overflow-x-auto pb-2">
-            <ContentCard 
-              title="Reflect and Move" 
-              href="/content/1"
-            />
-            <ContentCard 
-              title="Become Ready" 
-              href="/content/2"
-            />
-            <ContentCard 
-              title="Faith Journey" 
-              href="/content/3"
-            />
-            <ContentCard 
-              title="Community Love" 
-              href="/content/4"
-            />
-          </div>
+          <section aria-labelledby="recent-videos">
+            <h2 id="recent-videos" className="text-lg font-semibold mb-3">
+              Recent
+            </h2>
+            <YouTubeLatest youtubeUrl={church.youtube_url} max={6} />
+          </section>
         </div>
       )}
 
