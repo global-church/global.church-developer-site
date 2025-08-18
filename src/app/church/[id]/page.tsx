@@ -4,6 +4,7 @@ import { ChurchPublic } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import YouTubeLatest from "@/components/YouTubeLatest"
+import { getChannelIdFromAnyYouTubeUrl } from "@/lib/resolveChannelId"
 import { ArrowLeft, MoreVertical, MapPin, Instagram, Youtube, Mail, ExternalLink, Phone, Facebook } from "lucide-react"
 import Link from "next/link"
 
@@ -71,6 +72,30 @@ export default async function ChurchPage({
     return null
   })()
 
+  // Validate YouTube URL upfront to hide the section for 404/invalid links
+  const hasValidYouTube = church.youtube_url
+    ? Boolean(await getChannelIdFromAnyYouTubeUrl(church.youtube_url))
+    : false
+
+  // Build Google Maps Embed URL (prefer geojson, then lat/lng, then address)
+  const mapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_API_KEY || "AIzaSyDkQzMr59yjcmEIqmvQfW6cYb4ficfd8Qc" // This is a personal Google Cloud API key belonging to Trenton Sikute, and MUST only be used for free services.
+  const mapQuery = (() => {
+    const gj = church.geojson
+    if (gj && Array.isArray(gj.coordinates) && gj.coordinates.length === 2) {
+      const [lng, lat] = gj.coordinates as [number, number]
+      if (typeof lat === 'number' && typeof lng === 'number') return `${lat},${lng}`
+    }
+    if (typeof church.latitude === 'number' && typeof church.longitude === 'number') {
+      return `${church.latitude},${church.longitude}`
+    }
+    if (fullAddress.length > 0) return fullAddress
+    const namePlusLoc = [church.name, church.locality, church.region, church.country].filter(isValidPart).join(', ')
+    return namePlusLoc.length > 0 ? namePlusLoc : null
+  })()
+  const mapEmbedSrc = mapQuery
+    ? `https://www.google.com/maps/embed/v1/place?key=${mapsApiKey}&q=${encodeURIComponent(mapQuery)}&zoom=15`
+    : null
+
   // Extract a Facebook URL from social_media if present
   const facebookUrl = (() => {
     const list = Array.isArray(church.social_media) ? church.social_media : []
@@ -127,6 +152,24 @@ export default async function ChurchPage({
       return { language, day, time, description }
     })
   })()
+
+  // Compute non-empty Programs list for conditional rendering
+  const programsList: string[] = Array.isArray(church.programs_offered)
+    ? church.programs_offered
+        .map((program) => String(program).trim())
+        .filter((program) => program.length > 0)
+    : []
+
+  // Determine if Connect has at least one actionable button
+  const hasConnect: boolean = Boolean(
+    church.instagram_url ||
+    facebookUrl ||
+    hasValidYouTube ||
+    church.scraped_email ||
+    (preferredPhone && telHref) ||
+    church.giving_url ||
+    church.church_beliefs_url
+  )
 
   return (
     <div className="min-h-screen bg-gray-50 pb-32">
@@ -196,21 +239,42 @@ export default async function ChurchPage({
         </div>
       </div>
 
-      {/* Recent Videos (YouTube) */}
-      {church.youtube_url && (
-        <div className="px-4 py-6">
-          <section aria-labelledby="recent-videos">
-            <h2 id="recent-videos" className="text-lg font-semibold mb-3">
-              Recent
-            </h2>
-            <YouTubeLatest youtubeUrl={church.youtube_url} max={6} />
-          </section>
-        </div>
-      )}
-
       {/* Details */}
       <div className="px-4 py-2 space-y-4">
-        {(church.instagram_url || church.youtube_url || church.scraped_email || church.church_beliefs_url || preferredPhone || church.giving_url || facebookUrl) && (
+        {serviceLines.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 className="text-sm font-medium text-gray-700 mb-3 text-center">Services</h3>
+            <div className="space-y-2">
+              {serviceLines.slice(0, 10).map((s, idx) => (
+                <div key={`${s.language}-${s.day}-${s.time}-${idx}`} className="text-center text-gray-800">
+                  <span className="font-medium">{s.description}</span>
+                  {s.day && s.time && (
+                    <span>{` on ${s.day} @ ${s.time} `}</span>
+                  )}
+                  <em className="text-gray-500">{s.language}</em>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {programsList.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 className="text-sm font-medium text-gray-700 mb-3 text-center">Programs</h3>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {programsList.map((program: string, idx: number) => (
+                <span
+                  key={`${program}-${idx}`}
+                  className="inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-3 py-1 text-xs font-medium"
+                >
+                  {program}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {hasConnect && (
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <h3 className="text-sm font-medium text-gray-700 mb-3 text-center">Connect</h3>
             <div className="flex items-center justify-center flex-wrap gap-3">
@@ -236,9 +300,9 @@ export default async function ChurchPage({
                   <Facebook size={18} />
                 </a>
               )}
-              {church.youtube_url && (
+              {hasValidYouTube && (
                 <a
-                  href={church.youtube_url}
+                  href={church.youtube_url as string}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="YouTube"
@@ -291,20 +355,10 @@ export default async function ChurchPage({
           </div>
         )}
 
-        {serviceLines.length > 0 && (
+        {hasValidYouTube && (
           <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-3 text-center">Services</h3>
-            <div className="space-y-2">
-              {serviceLines.slice(0, 10).map((s, idx) => (
-                <div key={`${s.language}-${s.day}-${s.time}-${idx}`} className="text-center text-gray-800">
-                  <span className="font-medium">{s.description}</span>
-                  {s.day && s.time && (
-                    <span>{` on ${s.day} @ ${s.time} `}</span>
-                  )}
-                  <em className="text-gray-500">{s.language}</em>
-                </div>
-              ))}
-            </div>
+            <h3 className="text-sm font-medium text-gray-700 mb-3 text-center">YouTube</h3>
+            <YouTubeLatest youtubeUrl={church.youtube_url as string} max={6} />
           </div>
         )}
 
@@ -330,33 +384,27 @@ export default async function ChurchPage({
                 </a>
               )}
             </div>
+
+            {/* Google Maps Embed */}
+            {mapEmbedSrc && (
+              <div className="mt-4 rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
+                <div className="relative" style={{ paddingBottom: '66%', height: 0 }}>
+                  <iframe
+                    title="Church location map"
+                    src={mapEmbedSrc}
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    allowFullScreen
+                    className="absolute inset-0 w-full h-full"
+                    style={{ border: 0 }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {church.programs_offered && (
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-3 text-center">Programs</h3>
-            <div className="flex flex-wrap gap-2 justify-center">
-              {(
-                Array.isArray(church.programs_offered)
-                  ? church.programs_offered
-                  : String(church.programs_offered).split(",")
-              )
-                .map((p: string) => p.trim())
-                .filter((p: string) => p.length > 0)
-                .map((program: string, idx: number) => (
-                  <span
-                    key={`${program}-${idx}`}
-                    className="inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-3 py-1 text-xs font-medium"
-                  >
-                    {program}
-                  </span>
-                ))}
-            </div>
-          </div>
-        )}
-
-        {/* Visit Website moved below Programs */}
+        {/* Visit Website at the end */}
         {(() => {
           const raw = church.website || church.website_root || null
           if (!raw) return null
