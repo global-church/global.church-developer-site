@@ -1,74 +1,16 @@
 // src/app/page.tsx
 import type { Metadata } from "next"
-import { supabase } from "@/lib/supabase"
-import { ChurchPublic, BeliefType } from "@/lib/types"
 import MobileSearch from "@/components/MobileSearch"
-import ChurchCard from "@/components/ChurchCard"
-import SectionHeader from "@/components/SectionHeader"
 import Link from "next/link"
 import { MapPin } from "lucide-react"
+import NearbyResults from "@/components/NearbyResults"
 
 export const metadata: Metadata = {
   title: "Church Finding",
   description: "Find churches near you with our comprehensive directory",
 }
 
-async function getChurches(selectedBeliefs?: BeliefType[], selectedLanguages?: string[]): Promise<ChurchPublic[]> {
-  // Get churches ordered alphabetically by city (locality)
-  let query = supabase
-    .from("church_public")
-    .select("church_id,name,locality,region,country,belief_type,service_languages,services_info")
-    .not('locality', 'is', null) // Ensure locality exists
-
-  if (selectedBeliefs && selectedBeliefs.length > 0) {
-    query = query.in('belief_type', selectedBeliefs as string[])
-  }
-  if (selectedLanguages && selectedLanguages.length > 0) {
-    query = query.overlaps('service_languages', selectedLanguages)
-  }
-
-  const { data, error } = await query
-    .order("locality", { ascending: true }) // Order by city
-    .limit(20) // Limit to first 20 churches
-
-  if (error) {
-    console.error(error)
-    return []
-  }
-  return (data ?? []) as ChurchPublic[]
-}
-
-export default async function Page({
-  searchParams,
-}: {
-  searchParams: Promise<{ belief?: string; language?: string }>
-}) {
-  const { belief, language } = await searchParams
-
-  const selectedBeliefs: BeliefType[] = (belief
-    ? belief
-        .split(",")
-        .map((s) => s.trim().toLowerCase())
-        .filter((s): s is BeliefType =>
-          [
-            'protestant',
-            'roman_catholic',
-            'orthodox',
-            'anglican',
-            'other',
-          ].includes(s as BeliefType)
-        )
-    : []) as BeliefType[]
-
-  const selectedLanguages: string[] = (language
-    ? language
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0)
-    : [])
-
-  const churches = await getChurches(selectedBeliefs, selectedLanguages)
-
+export default function Page() {
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
@@ -96,28 +38,15 @@ export default async function Page({
 
       {/* Main Content */}
       <div className="px-4 py-6 space-y-8">
-        {/* Churches */}
-        <section>
-          <SectionHeader 
-            title="Churches" 
-            href="/nearby" 
-            actionText="View all"
-          />
-          <div className="space-y-3">
-            {churches.length > 0 ? (
-              churches.map((church) => (
-                <ChurchCard 
-                  key={church.church_id} 
-                  church={church} 
-                  variant="compact" 
-                  showMapButton={false} // Remove individual map buttons since we have a global one
-                />
-              ))
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <p>No churches found</p>
-              </div>
-            )}
+        <section className="space-y-2 text-center">
+          <h2 className="text-2xl font-semibold">Find churches near you</h2>
+          <p className="text-sm text-gray-600">
+            We’ll use your device’s location (with your permission) to show nearby churches.
+          </p>
+          <div className="flex justify-center">
+            <div className="w-full max-w-3xl">
+              <NearbyResults />
+            </div>
           </div>
         </section>
       </div>
