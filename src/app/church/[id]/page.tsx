@@ -80,7 +80,7 @@ export default async function ChurchPage({
     : false
 
   // Build Google Maps Embed URL (prefer geojson, then lat/lng, then address)
-  const mapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_API_KEY || "AIzaSyDkQzMr59yjcmEIqmvQfW6cYb4ficfd8Qc" // This is a personal Google Cloud API key belonging to Trenton Sikute, and MUST only be used for free services.
+  const mapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_API_KEY
   const mapQuery = (() => {
     const gj = church.geojson
     if (gj && Array.isArray(gj.coordinates) && gj.coordinates.length === 2) {
@@ -94,7 +94,7 @@ export default async function ChurchPage({
     const namePlusLoc = [church.name, church.locality, church.region, church.country].filter(isValidPart).join(', ')
     return namePlusLoc.length > 0 ? namePlusLoc : null
   })()
-  const mapEmbedSrc = mapQuery
+  const mapEmbedSrc = mapQuery && mapsApiKey
     ? `https://www.google.com/maps/embed/v1/place?key=${mapsApiKey}&q=${encodeURIComponent(mapQuery)}&zoom=15`
     : null
 
