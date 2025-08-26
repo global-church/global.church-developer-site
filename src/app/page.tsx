@@ -12,21 +12,23 @@ export const metadata: Metadata = {
 
 export default async function Page() {
   // Fetch initial pins so the map shows a broad sample of churches by default
-  const rows = await searchChurches({ limit: 300000 })
+  const rows = await searchChurches({ limit: 1000 })
 
-  const initialPins = (rows ?? []).map((r: any) => ({
-    church_id: r.church_id,
-    name: r.name,
-    latitude: r.latitude,
-    longitude: r.longitude,
-    locality: r.locality,
-    region: r.region,
-    country: r.country,
-    website: r.website,
-    belief_type: r.belief_type,
-    service_languages: Array.isArray(r.service_languages) ? r.service_languages : null,
-    geojson: null,
-  }))
+  const initialPins = (rows ?? [])
+    .filter((r) => typeof r.latitude === 'number' && typeof r.longitude === 'number')
+    .map((r) => ({
+      church_id: r.church_id,
+      name: r.name,
+      latitude: r.latitude as number,
+      longitude: r.longitude as number,
+      locality: r.locality,
+      region: r.region,
+      country: r.country,
+      website: r.website,
+      belief_type: r.belief_type ?? null,
+      service_languages: Array.isArray(r.service_languages) ? r.service_languages : null,
+      geojson: null,
+    }))
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">

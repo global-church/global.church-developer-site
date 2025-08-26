@@ -9,7 +9,7 @@ if (!ZUPLO_API_URL || !ZUPLO_API_KEY) {
 }
 
 // A generic fetch function to handle calls to our Zuplo API
-async function fetchFromZuploAPI<T>(params: Record<string, any>): Promise<T> {
+async function fetchFromZuploAPI<T>(params: Record<string, unknown>): Promise<T> {
   // All church search routes are served behind /v1/churches/search with query params
   const url = new URL(`${ZUPLO_API_URL}/v1/churches/search`);
 
