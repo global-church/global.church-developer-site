@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { supabase } from "@/lib/supabase"
+import { searchChurches as searchChurchesFromApi } from "@/lib/zuplo"
 import { ChurchPublic, BeliefType } from "@/lib/types"
 import ChurchCard from "@/components/ChurchCard"
 import { Badge } from "@/components/ui/badge"
@@ -14,134 +14,18 @@ export const metadata: Metadata = {
 }
 
 async function searchChurches(query: string, selectedBeliefs: BeliefType[], selectedLanguages: string[]): Promise<ChurchPublic[]> {
-  const baseSelect = "church_id,name,locality,region,country,belief_type,church_summary,service_languages,services_info"
-
-  // Primary: case-insensitive substring across multiple fields
-  const like = `%${query}%`
-  const orFilter = [
-    `name.ilike.${like}`,
-    `locality.ilike.${like}`,
-    `region.ilike.${like}`,
-    `country.ilike.${like}`,
-    `church_summary.ilike.${like}`,
-  ].join(',')
-
-  let primaryQuery = supabase
-    .from("church_public")
-    .select(baseSelect)
-    .or(orFilter)
-
-  if (selectedBeliefs && selectedBeliefs.length > 0) {
-    primaryQuery = primaryQuery.in('belief_type', selectedBeliefs as unknown as string[])
-  }
-  if (selectedLanguages && selectedLanguages.length > 0) {
-    primaryQuery = primaryQuery.overlaps('service_languages', selectedLanguages)
-  }
-
-  const { data, error } = await primaryQuery.limit(200)
-
-  if (error) {
-    console.error(error)
+  try {
+    const churches = await searchChurchesFromApi({
+      q: query,
+      belief: selectedBeliefs.length > 0 ? selectedBeliefs.join(',') : undefined,
+      languages: selectedLanguages.length > 0 ? selectedLanguages : undefined,
+      limit: 50,
+    })
+    return churches
+  } catch (error) {
+    console.error('Failed to search churches:', error)
     return []
   }
-  const primary = (data ?? []) as ChurchPublic[]
-  if (primary.length > 0) {
-    const norm = (s: string) => (s || '').normalize('NFKD').replace(/\p{Diacritic}/gu, '').toLowerCase()
-    const nq = norm(query)
-    const contains = (s?: string | null) => norm(s || '').includes(nq)
-    const bigrams = (s: string) => {
-      const n = s.length
-      const grams: string[] = []
-      for (let i = 0; i < n - 1; i++) grams.push(s.slice(i, i + 2))
-      return grams
-    }
-    const dice = (a: string, b: string) => {
-      const aG = bigrams(norm(a))
-      const bG = bigrams(norm(b))
-      if (aG.length === 0 || bG.length === 0) return 0
-      const bCounts = new Map<string, number>()
-      for (const g of bG) bCounts.set(g, (bCounts.get(g) || 0) + 1)
-      let overlap = 0
-      for (const g of aG) {
-        const c = bCounts.get(g) || 0
-        if (c > 0) {
-          overlap++
-          bCounts.set(g, c - 1)
-        }
-      }
-      return (2 * overlap) / (aG.length + bG.length)
-    }
-
-    const rankedPrimary = primary
-      .map((row) => {
-        const score =
-          1.0 * dice(query, row.name || '') +
-          (contains(row.name) ? 1.0 : 0) +
-          (contains(row.church_summary || undefined) ? 0.5 : 0) +
-          (contains(row.locality) ? 0.4 : 0) +
-          (contains(row.region && row.region.toLowerCase() !== 'null' ? row.region : '') ? 0.3 : 0) +
-          (contains(row.country) ? 0.2 : 0)
-        return { row, score }
-      })
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 50)
-      .map((x) => x.row)
-
-    return rankedPrimary
-  }
-
-  // Fallback: fetch a larger sample and rank by client-side similarity to surface slight typos
-  let fallbackQuery = supabase
-    .from("church_public")
-    .select(baseSelect)
-
-  if (selectedBeliefs && selectedBeliefs.length > 0) {
-    fallbackQuery = fallbackQuery.in('belief_type', selectedBeliefs as unknown as string[])
-  }
-  if (selectedLanguages && selectedLanguages.length > 0) {
-    fallbackQuery = fallbackQuery.overlaps('service_languages', selectedLanguages)
-  }
-
-  const { data: sample, error: sampleError } = await fallbackQuery.limit(600)
-
-  if (sampleError || !sample) {
-    if (sampleError) console.error(sampleError)
-    return []
-  }
-
-  // Simple normalized bigram similarity (fast and decent for small typos)
-  const norm = (s: string) => s.normalize('NFKD').replace(/\p{Diacritic}/gu, '').toLowerCase()
-  const bigrams = (s: string) => {
-    const n = s.length
-    const grams: string[] = []
-    for (let i = 0; i < n - 1; i++) grams.push(s.slice(i, i + 2))
-    return grams
-  }
-  const dice = (a: string, b: string) => {
-    const aG = bigrams(norm(a))
-    const bG = bigrams(norm(b))
-    if (aG.length === 0 || bG.length === 0) return 0
-    const bCounts = new Map<string, number>()
-    for (const g of bG) bCounts.set(g, (bCounts.get(g) || 0) + 1)
-    let overlap = 0
-    for (const g of aG) {
-      const c = bCounts.get(g) || 0
-      if (c > 0) {
-        overlap++
-        bCounts.set(g, c - 1)
-      }
-    }
-    return (2 * overlap) / (aG.length + bG.length)
-  }
-
-  const ranked = (sample as ChurchPublic[])
-    .map((row) => ({ row, score: dice(query, row.name || '') }))
-    .filter((x) => x.score >= 0.25) // threshold for slight typos
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 50)
-    .map((x) => x.row)
-
-  return ranked
 }
 
 export default async function SearchPage({

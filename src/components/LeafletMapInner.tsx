@@ -7,7 +7,7 @@ import type { DivIcon, LatLngBoundsExpression } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import Link from 'next/link'
 import * as GeoJSON from 'geojson'
-import { supabase } from '@/lib/supabase'
+import { searchChurchesByBbox } from '@/lib/zuplo'
 
 // ChurchPin type is now defined in ChurchMap.tsx
 
@@ -26,6 +26,7 @@ export default function LeafletMapInner({
 	center = [25, 10],
 	zoom = 3,
 	filters: _filters,
+	fitKey,
 }: {
 	pins: {
 		church_id: string
@@ -43,6 +44,7 @@ export default function LeafletMapInner({
 	center?: [number, number]
 	zoom?: number
 	filters?: { q?: string; belief?: string; region?: string; country?: string; language?: string }
+	fitKey?: number
 }) {
 	const [blackPinIcon, setBlackPinIcon] = useState<DivIcon | null>(null)
   const [clusterIndex, setClusterIndex] = useState<Supercluster | null>(null)
@@ -51,6 +53,10 @@ export default function LeafletMapInner({
   const [pinsState, setPinsState] = useState<typeof pins>(pins)
   const debounceTimerRef = useRef<number | null>(null)
   const requestIdRef = useRef<number>(0)
+  const rpcUnavailableRef = useRef<boolean>(false)
+  const lastBoundsKeyRef = useRef<string>('')
+  const lastAppliedFitKeyRef = useRef<number>(-1)
+  const userInteractingRef = useRef<boolean>(false)
 
   // Linear scale helpers are defined at module scope
 
@@ -218,6 +224,12 @@ export default function LeafletMapInner({
   }, [zoomLevel])
 
   // Build Supercluster index when pins change (prefer geojson when present)
+  // Keep internal state in sync with incoming props so external filters immediately update markers
+  useEffect(() => {
+    setPinsState(pins)
+  }, [pins])
+
+  // Rebuild clustering index any time our pins state changes
   useEffect(() => {
     const features: FeaturePoint[] = pinsState.map((p) => {
       const coords = p.geojson?.coordinates || [p.longitude, p.latitude]
@@ -237,14 +249,18 @@ export default function LeafletMapInner({
     const b = map.getBounds()
     const maybePad = (b as unknown as { pad?: (bufferRatio: number) => typeof b }).pad
     const padded = typeof maybePad === 'function' ? maybePad.call(b as unknown as object, padding) : b
-    const nextBounds: [number, number, number, number] = [padded.getWest(), padded.getSouth(), padded.getEast(), padded.getNorth()]
-    const nextZoom = map.getZoom()
-    setBounds((prev) => {
-      const prevFlat = prev ? [prev[0][0], prev[0][1], prev[1][0], prev[1][1]] : null
-      const equal = prevFlat && nextBounds.every((v, i) => Math.abs(v - (prevFlat as number[])[i]) <= 1e-6)
-      return equal ? prev : [[nextBounds[0], nextBounds[1]], [nextBounds[2], nextBounds[3]]]
-    })
-    setZoomLevel((prev) => (Math.abs(prev - nextZoom) <= 1e-3 ? prev : nextZoom))
+    const west = padded.getWest()
+    const south = padded.getSouth()
+    const east = padded.getEast()
+    const north = padded.getNorth()
+    const zoomNow = map.getZoom()
+    // Round to reduce jitter and prevent infinite update loops
+    const key = `${west.toFixed(4)}|${south.toFixed(4)}|${east.toFixed(4)}|${north.toFixed(4)}|${zoomNow.toFixed(2)}`
+    if (lastBoundsKeyRef.current === key) return
+    lastBoundsKeyRef.current = key
+    const nextBounds: [number, number, number, number] = [west, south, east, north]
+    setBounds([[nextBounds[0], nextBounds[1]], [nextBounds[2], nextBounds[3]]])
+    setZoomLevel((prev) => (Math.abs(prev - zoomNow) <= 1e-3 ? prev : zoomNow))
   }, [])
 
   // Debounced viewport fetch using public RPC churches_in_bbox
@@ -268,6 +284,7 @@ export default function LeafletMapInner({
     debounceTimerRef.current = window.setTimeout(async () => {
       const reqId = ++requestIdRef.current
       try {
+        if (rpcUnavailableRef.current) return
         // Ensure numeric params
         const p_min_lng = Number(minLng)
         const p_min_lat = Number(minLat)
@@ -276,20 +293,16 @@ export default function LeafletMapInner({
         if (!Number.isFinite(p_min_lng) || !Number.isFinite(p_min_lat) || !Number.isFinite(p_max_lng) || !Number.isFinite(p_max_lat)) {
           return
         }
-        const { data, error } = await supabase.rpc('churches_in_bbox', {
-          p_min_lng,
-          p_min_lat,
-          p_max_lng,
-          p_max_lat,
-          p_limit: 500,
+        const data = await searchChurchesByBbox({
+          min_lng: p_min_lng,
+          min_lat: p_min_lat,
+          max_lng: p_max_lng,
+          max_lat: p_max_lat,
+          limit: 500,
         })
         // Guard against stale responses
         if (reqId !== requestIdRef.current) return
 
-        if (error) {
-          console.error('fetchChurchesInBBox error:', error)
-          return
-        }
         const rows = (data ?? []) as Array<{
           church_id: string
           name: string
@@ -337,11 +350,72 @@ export default function LeafletMapInner({
       update()
       map.on('moveend', update)
       map.on('zoomend', update)
+      const onStart = () => { userInteractingRef.current = true }
+      const onEnd = () => { userInteractingRef.current = false }
+      map.on('movestart', onStart)
+      map.on('dragstart', onStart)
+      map.on('zoomstart', onStart)
+      map.on('dragend', onEnd)
+      map.on('zoomend', onEnd)
+      map.on('moveend', onEnd)
       return () => {
         map.off('moveend', update)
         map.off('zoomend', update)
+        map.off('movestart', onStart)
+        map.off('dragstart', onStart)
+        map.off('zoomstart', onStart)
+        map.off('dragend', onEnd)
+        map.off('zoomend', onEnd)
+        map.off('moveend', onEnd)
       }
     }, [map, onChange, padding])
+    return null
+  }
+
+  // Auto-fit to incoming pins from props (filters/search). Maintain ~20% frame padding (10% each side)
+  function FitToPins({ pinsToFit, triggerKey }: { pinsToFit: typeof pins; triggerKey: number | undefined }) {
+    const map = useMap()
+    useEffect(() => {
+      if (!pinsToFit || pinsToFit.length === 0) return
+      if (typeof triggerKey !== 'number') return
+      if (triggerKey === lastAppliedFitKeyRef.current) return
+      // Do not override user's active interaction
+      if (userInteractingRef.current) return
+      let minLat = 90, minLng = 180, maxLat = -90, maxLng = -180
+      for (const p of pinsToFit) {
+        const lat = Number((p as { latitude: number }).latitude)
+        const lng = Number((p as { longitude: number }).longitude)
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue
+        if (lat < minLat) minLat = lat
+        if (lng < minLng) minLng = lng
+        if (lat > maxLat) maxLat = lat
+        if (lng > maxLng) maxLng = lng
+      }
+      if (!(Number.isFinite(minLat) && Number.isFinite(minLng) && Number.isFinite(maxLat) && Number.isFinite(maxLng))) return
+
+      const size = map.getSize()
+      const padX = Math.max(0, Math.round(size.x * 0.1))
+      const padY = Math.max(0, Math.round(size.y * 0.1))
+
+      // If only one point, zoom to the maximum allowed level while centering the pin
+      if (Math.abs(maxLat - minLat) < 1e-9 && Math.abs(maxLng - minLng) < 1e-9) {
+        const maxZoomFromMap = (map as unknown as { getMaxZoom?: () => number }).getMaxZoom?.()
+        const targetZoom = Number.isFinite(maxZoomFromMap) ? Math.min(18, Number(maxZoomFromMap)) : 18
+        map.setView([minLat, minLng], targetZoom, { animate: true })
+        lastAppliedFitKeyRef.current = triggerKey
+        return
+      }
+
+      // Fit tightly with padding so pins fill ~80% inner area; explicitly cap max zoom for a tighter view
+      const bounds: [[number, number], [number, number]] = [[minLat, minLng], [maxLat, maxLng]]
+      if ((map as unknown as { flyToBounds?: Function }).flyToBounds) {
+        ;(map as unknown as { flyToBounds: (b: typeof bounds, o: { paddingTopLeft: [number, number]; paddingBottomRight: [number, number]; maxZoom: number; animate: boolean }) => void })
+          .flyToBounds(bounds, { paddingTopLeft: [padX, padY], paddingBottomRight: [padX, padY], maxZoom: 18, animate: true })
+      } else {
+        map.fitBounds(bounds, { paddingTopLeft: [padX, padY], paddingBottomRight: [padX, padY], maxZoom: 18, animate: true })
+      }
+      lastAppliedFitKeyRef.current = triggerKey
+    }, [triggerKey, map])
     return null
   }
 
@@ -381,6 +455,7 @@ export default function LeafletMapInner({
 				<TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 				<ZoomControl position="topright" />
 				<MapStateSyncCore onChange={handleMapChange} padding={0.75} />
+				<FitToPins pinsToFit={pins} triggerKey={fitKey} />
 				{clusterIndex && bounds && (
 					<>
 						{clusterIndex.getClusters([bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1]], Math.round(zoomLevel)).map((c) => {

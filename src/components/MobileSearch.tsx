@@ -50,12 +50,14 @@ export default function MobileSearch({ context = 'home', initialQuery = '' }: Mo
     if (!q) return
     const params = new URLSearchParams()
     params.set('q', q)
-    if (selectedBeliefs.size) {
-      params.set('belief', Array.from(selectedBeliefs).join(','))
-    }
+    if (selectedBeliefs.size) params.set('belief', Array.from(selectedBeliefs).join(','))
     const language = sp.get('language')
     if (language) params.set('language', language)
-    router.push(`/search?${params.toString()}`)
+    if (context === 'search') {
+      router.push(`/search?${params.toString()}`)
+    } else {
+      router.push(`/${params.toString() ? `?${params.toString()}` : ''}`)
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -113,7 +115,7 @@ export default function MobileSearch({ context = 'home', initialQuery = '' }: Mo
   return (
     <div className="px-4 py-3 bg-white">
       <div className="flex items-stretch gap-2">
-        <div className="relative flex-1">
+        <div className="relative flex-1 md:flex-[1.5]">
           <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
           <Input
             type="text"
@@ -130,44 +132,48 @@ export default function MobileSearch({ context = 'home', initialQuery = '' }: Mo
         >
           Search
         </Button>
-        <div className="relative">
-          <Button
-            variant="outline"
-            onClick={() => setFilterOpen((v) => !v)}
-            className="px-3 py-1.5 text-sm"
-          >
-            <Filter size={16} className="mr-2" />
-            Filter By Type{selectedCount ? ` (${selectedCount})` : ''}
-          </Button>
+        {context === 'search' && (
+          <>
+            <div className="relative">
+              <Button
+                variant="outline"
+                onClick={() => setFilterOpen((v) => !v)}
+                className="px-3 py-1.5 text-sm"
+              >
+                <Filter size={16} className="mr-2" />
+                Filter By Type{selectedCount ? ` (${selectedCount})` : ''}
+              </Button>
 
-          {filterOpen && (
-            <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3">
-              <div className="max-h-64 overflow-auto space-y-2">
-                {BELIEF_OPTIONS.map((opt) => {
-                  const checked = selectedBeliefs.has(opt.value)
-                  const id = `belief-${opt.value}`
-                  return (
-                    <label key={opt.value} htmlFor={id} className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        id={id}
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-gray-300"
-                        checked={checked}
-                        onChange={() => toggleBelief(opt.value)}
-                      />
-                      <span className="text-sm">{opt.label}</span>
-                    </label>
-                  )
-                })}
-              </div>
-              <div className="flex justify-end gap-2 pt-3">
-                <Button variant="outline" size="sm" onClick={clearFilters}>Clear</Button>
-                <Button size="sm" onClick={applyFilters}>Apply</Button>
-              </div>
+              {filterOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3">
+                  <div className="max-h-64 overflow-auto space-y-2">
+                    {BELIEF_OPTIONS.map((opt) => {
+                      const checked = selectedBeliefs.has(opt.value)
+                      const id = `belief-${opt.value}`
+                      return (
+                        <label key={opt.value} htmlFor={id} className="flex items-center gap-2 cursor-pointer select-none">
+                          <input
+                            id={id}
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-gray-300"
+                            checked={checked}
+                            onChange={() => toggleBelief(opt.value)}
+                          />
+                          <span className="text-sm">{opt.label}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                  <div className="flex justify-end gap-2 pt-3">
+                    <Button variant="outline" size="sm" onClick={clearFilters}>Clear</Button>
+                    <Button size="sm" onClick={applyFilters}>Apply</Button>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        <LanguageFilterButton />
+            <LanguageFilterButton />
+          </>
+        )}
       </div>
     </div>
   )

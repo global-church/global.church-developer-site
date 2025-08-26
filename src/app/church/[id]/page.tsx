@@ -1,5 +1,5 @@
 // src/app/church/[id]/page.tsx
-import { supabase } from "@/lib/supabase"
+import { searchChurches } from "@/lib/zuplo"
 import { ChurchPublic } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -18,15 +18,9 @@ export default async function ChurchPage({
   params,
 }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { data, error } = await supabase
-    .from("church_public")
-    .select("*")
-    .eq("church_id", id)
-    .maybeSingle()
+  const churches = await searchChurches({ id: id, limit: 1 })
+  const data = churches[0] || null
 
-  if (error) {
-    console.error("Failed to load church", { id, error })
-  }
   if (!data) {
     // Graceful empty state rather than a 404 so users can recover
     return (
@@ -353,11 +347,9 @@ export default async function ChurchPage({
           </div>
         )}
 
-        {hasValidYouTube && (
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-3 text-center">YouTube</h3>
-            <YouTubeLatest youtubeUrl={church.youtube_url as string} max={6} />
-          </div>
+        {/* YouTube section renders itself (includes wrapper + heading) and hides on 404/invalid */}
+        {church.youtube_url && (
+          <YouTubeLatest youtubeUrl={church.youtube_url as string} max={6} wrap title="YouTube" />
         )}
 
         {/* Facebook (below YouTube) - temporarily always shown */}

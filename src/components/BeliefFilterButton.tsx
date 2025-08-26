@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Filter } from 'lucide-react'
@@ -17,6 +17,7 @@ type BeliefValue = typeof BELIEF_OPTIONS[number]['value']
 
 export default function BeliefFilterButton() {
   const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement | null>(null)
   const [selected, setSelected] = useState<Set<BeliefValue>>(new Set())
   const router = useRouter()
   const sp = useSearchParams()
@@ -65,10 +66,28 @@ export default function BeliefFilterButton() {
     setOpen(false)
   }
 
+  function selectAll() {
+    const all = new Set<BeliefValue>((BELIEF_OPTIONS as readonly { value: string; label: string }[]).map((o) => o.value as BeliefValue))
+    setSelected(all)
+  }
+
   const count = selected.size
 
+  // Close on outside click
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!open) return
+      const el = containerRef.current
+      if (el && e.target instanceof Node && !el.contains(e.target)) {
+        apply()
+      }
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [open])
+
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <Button
         variant="outline"
         onClick={() => setOpen((v) => !v)}
@@ -79,7 +98,7 @@ export default function BeliefFilterButton() {
       </Button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3">
+        <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-[1000] p-3">
           <div className="max-h-64 overflow-auto space-y-2">
             {BELIEF_OPTIONS.map((opt) => {
               const checked = selected.has(opt.value)
@@ -99,7 +118,7 @@ export default function BeliefFilterButton() {
             })}
           </div>
           <div className="flex justify-end gap-2 pt-3">
-            <Button variant="outline" size="sm" onClick={clear}>Clear</Button>
+            <Button variant="outline" size="sm" onClick={selectAll}>Select All</Button>
             <Button size="sm" onClick={apply}>Apply</Button>
           </div>
         </div>

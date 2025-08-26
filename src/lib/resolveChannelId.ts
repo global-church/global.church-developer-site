@@ -8,13 +8,16 @@ const HEADERS = {
   'Accept-Language': 'en-US,en;q=0.9',
 };
 
-async function fetchText(url: string): Promise<string | null> {
+type FetchedPage = { html: string | null; finalUrl: string | null };
+
+async function fetchPage(url: string): Promise<FetchedPage> {
   try {
     const res = await fetch(url, { headers: HEADERS, redirect: 'follow' as const });
-    if (!res.ok) return null;
-    return await res.text();
+    if (!res.ok) return { html: null, finalUrl: res.url || null };
+    const html = await res.text();
+    return { html, finalUrl: res.url || url };
   } catch {
-    return null;
+    return { html: null, finalUrl: null };
   }
 }
 
@@ -40,7 +43,7 @@ function extractUCidFromHtml(html: string): string | null {
 
 async function tryUrls(urls: string[]): Promise<string | null> {
   for (const url of urls) {
-    const html = await fetchText(url);
+    const { html } = await fetchPage(url);
     if (!html) continue;
 
     // Some consent pages are short and won't contain UC ids; skip those
@@ -48,6 +51,118 @@ async function tryUrls(urls: string[]): Promise<string | null> {
 
     const ucid = extractUCidFromHtml(html);
     if (ucid) return ucid;
+  }
+  return null;
+}
+
+function extractHandleFromHtml(html: string): string | null {
+  const patterns = [
+    /"canonicalBaseUrl":"\/( @[A-Za-z0-9._-]+)"/, // we'll normalize spaces below
+    /<link rel="canonical" href="https?:\/\/(?:www\.)?youtube\.com\/(@[A-Za-z0-9._-]+)"/,
+    /"handle":"(@[A-Za-z0-9._-]+)"/,
+    /<meta property="og:url" content="https?:\/\/(?:www\.)?youtube\.com\/(@[A-Za-z0-9._-]+)"/,
+  ];
+  for (const re of patterns) {
+    const m = html.match(re);
+    if (m) {
+      const handleWithAt = (m[2] ?? m[1]) as string | undefined;
+      if (handleWithAt) return handleWithAt.replace(/\s+/g, '').replace(/^@?/, '@');
+    }
+  }
+  // Fallback: search for \/@handle occurrences
+  const m = html.match(/\/@([A-Za-z0-9._-]+)/);
+  if (m) return `@${m[1]}`;
+  return null;
+}
+
+function extractVanitySlugsFromHtml(html: string): Set<string> {
+  const lower = html.toLowerCase();
+  const slugs = new Set<string>();
+  const patterns: RegExp[] = [
+    /"vanityChannelUrl"\s*:\s*"\\\/c\\\/([a-z0-9._-]+)"/g,
+    /"vanityChannelUrl"\s*:\s*"\/c\/([a-z0-9._-]+)"/g,
+    /"customUrl"\s*:\s*"([a-z0-9._-]+)"/g,
+    /<link rel="canonical" href="https?:\/\/(?:www\.)?youtube\.com\/c\/([a-z0-9._-]+)"/g,
+  ];
+  for (const re of patterns) {
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(lower)) !== null) {
+      if (m[1]) slugs.add(m[1]);
+    }
+  }
+  return slugs;
+}
+
+async function tryUrlsWithExpectedHandle(urls: string[], expectedHandle: string | null, expectedSlug?: string | null): Promise<string | null> {
+  const expectedLower = expectedHandle?.toLowerCase() ?? null;
+  const slugLower = expectedSlug ? expectedSlug.toLowerCase() : null;
+  for (const url of urls) {
+    const { html, finalUrl } = await fetchPage(url);
+    if (!html) continue;
+    if (html.length < 2000 && /consent|enable\-javascript|cookies/i.test(html)) continue;
+
+    // If redirect landed on an explicit handle path, prefer validating against it quickly
+    if (expectedLower && finalUrl) {
+      try {
+        const u = new URL(finalUrl);
+        const path = u.pathname || '';
+        const match = path.match(/\/@([A-Za-z0-9._-]+)/);
+        if (match) {
+          const handleFromUrlNoAt = match[1].toLowerCase();
+          const expectedNoAt = expectedLower.replace(/^@/, '').toLowerCase();
+          if (handleFromUrlNoAt !== expectedNoAt) {
+            continue; // mismatched redirect
+          }
+        }
+      } catch {
+        // ignore URL parse issues
+      }
+    }
+
+    const ucid = extractUCidFromHtml(html);
+    if (!ucid) continue;
+
+    // For custom (/c/<slug>) inputs, if we don't have an expected handle, require a strong slug signal
+    if (!expectedLower && slugLower) {
+      // If the page exposes a handle, require that it at least contains the slug to reduce cross-channel redirects
+      const pageHandle = extractHandleFromHtml(html);
+      if (pageHandle) {
+        const handleNoAt = pageHandle.toLowerCase().replace(/^@/, '');
+        if (!handleNoAt.includes(slugLower)) {
+          // The resolved channel's handle does not resemble the provided custom slug → reject
+          continue;
+        }
+      }
+
+      const slugs = extractVanitySlugsFromHtml(html);
+      if (!slugs.has(slugLower)) {
+        // As a second attempt, verify channel's About page explicitly lists the vanity/custom URL
+        const channelCheck = await fetchPage(`https://www.youtube.com/channel/${ucid}/about`);
+        if (!channelCheck.html) continue;
+        const aboutSlugs = extractVanitySlugsFromHtml(channelCheck.html);
+        if (!aboutSlugs.has(slugLower)) continue;
+      }
+      return ucid;
+    }
+
+    if (!expectedLower) return ucid; // no validation requested and no slug constraint
+
+    const handle = extractHandleFromHtml(html);
+    const expectedNoAt = expectedLower.replace(/^@/, '').toLowerCase();
+    if (handle && handle.toLowerCase().replace(/^@/, '') === expectedNoAt) {
+      return ucid; // matches the expected handle
+    }
+
+    // If the page we landed on doesn't clearly show the handle, perform a second validation round-trip
+    // against the channel page derived from UCID to confirm its canonical handle matches expectation.
+    const channelCheck = await fetchPage(`https://www.youtube.com/channel/${ucid}/about`);
+    if (channelCheck.html) {
+      const handle2 = extractHandleFromHtml(channelCheck.html);
+      if (handle2 && handle2.toLowerCase().replace(/^@/, '') === expectedNoAt) {
+        return ucid;
+      }
+    }
+    // Otherwise reject and continue candidates
   }
   return null;
 }
@@ -65,7 +180,7 @@ async function resolveViaOEmbed(originalUrl: string): Promise<string | null> {
     if (!res.ok) return null;
     const data = (await res.json()) as { author_url?: string };
     if (!data?.author_url) return null;
-    const html = await fetchText(data.author_url);
+    const { html } = await fetchPage(data.author_url);
     return html ? extractUCidFromHtml(html) : null;
   } catch {
     return null;
@@ -79,18 +194,41 @@ export async function getChannelIdFromAnyYouTubeUrl(youtubeUrl: string): Promise
   // Direct channel id
   if (kind === 'channel') return idOrPath;
 
-  // Handle / user pages (and things like /@handle/streams or /videos)
-  if (kind === 'handle' || kind === 'user') {
-    const handle = baseHandlePath(idOrPath); // "@allsoulsepiscopalarlingtontx"
+  // Handle / user / custom pages (and things like /@handle/streams or /videos)
+  if (kind === 'handle' || kind === 'user' || kind === 'custom') {
+    const slug = idOrPath; // e.g., "stecimedia"
+    const handle = baseHandlePath(idOrPath); // e.g., "@stecimedia"
     const candidates = [
+      // Handle-based
       `https://www.youtube.com/${handle}`,
       `https://www.youtube.com/${handle}/about`,
       `https://www.youtube.com/${handle}/videos`,
       `https://www.youtube.com/${handle}/streams`,
       `https://m.youtube.com/${handle}`,
       `https://m.youtube.com/${handle}/about`,
+      `https://m.youtube.com/${handle}/videos`,
+      `https://m.youtube.com/${handle}/streams`,
+      // Legacy user-based
+      `https://www.youtube.com/user/${slug}`,
+      `https://www.youtube.com/user/${slug}/about`,
+      `https://www.youtube.com/user/${slug}/videos`,
+      `https://www.youtube.com/user/${slug}/streams`,
+      `https://m.youtube.com/user/${slug}`,
+      `https://m.youtube.com/user/${slug}/about`,
+      `https://m.youtube.com/user/${slug}/videos`,
+      `https://m.youtube.com/user/${slug}/streams`,
+      // Legacy custom /c/
+      `https://www.youtube.com/c/${slug}`,
+      `https://www.youtube.com/c/${slug}/about`,
+      `https://www.youtube.com/c/${slug}/videos`,
+      `https://www.youtube.com/c/${slug}/streams`,
+      `https://m.youtube.com/c/${slug}`,
+      `https://m.youtube.com/c/${slug}/about`,
+      `https://m.youtube.com/c/${slug}/videos`,
+      `https://m.youtube.com/c/${slug}/streams`,
     ];
-    const ucid = await tryUrls(candidates);
+    const expected = kind === 'handle' ? handle : null; // only validate for explicit handle; user/custom may not match
+    const ucid = await tryUrlsWithExpectedHandle(candidates, expected, slug);
     if (ucid) return ucid;
     // fallthrough to last resort attempts
   }
@@ -106,5 +244,11 @@ export async function getChannelIdFromAnyYouTubeUrl(youtubeUrl: string): Promise
     youtubeUrl,
     youtubeUrl.replace(/\/(streams|videos|about)\/?$/, ''),
   ];
+  if (kind === 'handle') {
+    return await tryUrlsWithExpectedHandle(lastResort, baseHandlePath(idOrPath));
+  }
+  if (kind === 'custom') {
+    return await tryUrlsWithExpectedHandle(lastResort, null, idOrPath);
+  }
   return await tryUrls(lastResort);
 }

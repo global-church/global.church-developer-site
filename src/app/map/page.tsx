@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { searchChurches } from '@/lib/zuplo'
 import ChurchMap from '@/components/ChurchMap'
 import type { ChurchPublic } from '@/lib/types'
 import Link from 'next/link'
@@ -39,27 +39,14 @@ export default async function MapPage({
 }) {
   const sp: SearchParams = await searchParams
 
-  // Build filtered query directly for the pins we render (include geojson)
-  let query = supabase
-    .from('church_public')
-    .select('church_id,name,latitude,longitude,locality,region,country,website,belief_type,service_languages,geojson')
-    .limit(500)
-
-  if (sp.q) query = query.ilike('name', `%${sp.q}%`)
-  if (sp.belief) {
-    const beliefs = sp.belief.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
-    if (beliefs.length === 1) query = query.eq('belief_type', beliefs[0])
-    else if (beliefs.length > 1) query = query.in('belief_type', beliefs)
-  }
-  if (sp.language) {
-    const languages = sp.language.split(',').map((s) => s.trim()).filter(Boolean)
-    if (languages.length > 0) query = query.overlaps('service_languages', languages)
-  }
-  if (sp.region) query = query.ilike('region', `%${sp.region}%`)
-  if (sp.country) query = query.eq('country', sp.country.toUpperCase())
-
-  const { data = [], error } = await query
-  if (error) console.error(error)
+  const data = await searchChurches({
+    q: sp.q,
+    belief: sp.belief,
+    region: sp.region,
+    country: sp.country,
+    languages: sp.language ? sp.language.split(',') : undefined,
+    limit: 500,
+  })
 
   const pins = (data as Row[])
     .filter((r) => (r.geojson && Array.isArray(r.geojson.coordinates)) || (typeof r.latitude === 'number' && typeof r.longitude === 'number'))

@@ -1,7 +1,7 @@
 // src/lib/youtube.ts
 
 export function classifyYouTubeUrl(url: string): {
-    kind: 'channel'|'handle'|'user'|'video'|'playlist'|'unknown',
+    kind: 'channel'|'handle'|'user'|'custom'|'video'|'playlist'|'unknown',
     idOrPath: string
   } {
     try {
@@ -20,6 +20,7 @@ export function classifyYouTubeUrl(url: string): {
       if (path.startsWith('/channel/')) return { kind: 'channel', idOrPath: path.split('/')[2] };
       if (path.startsWith('/@'))       return { kind: 'handle',  idOrPath: path.slice(1) };
       if (path.startsWith('/user/'))   return { kind: 'user',    idOrPath: path.split('/')[2] };
+      if (path.startsWith('/c/'))      return { kind: 'custom',  idOrPath: path.split('/')[2] };
   
       if (path === '/watch') {
         const v = u.searchParams.get('v');

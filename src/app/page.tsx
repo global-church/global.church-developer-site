@@ -1,16 +1,33 @@
 // src/app/page.tsx
 import type { Metadata } from "next"
-import MobileSearch from "@/components/MobileSearch"
+// Search bar removed from header per new Explore layout
 import Link from "next/link"
-import { MapPin } from "lucide-react"
 import NearbyResults from "@/components/NearbyResults"
+import { searchChurches } from "@/lib/zuplo"
 
 export const metadata: Metadata = {
   title: "Church Finding",
   description: "Find churches near you with our comprehensive directory",
 }
 
-export default function Page() {
+export default async function Page() {
+  // Fetch initial pins so the map shows a broad sample of churches by default
+  const rows = await searchChurches({ limit: 300000 })
+
+  const initialPins = (rows ?? []).map((r: any) => ({
+    church_id: r.church_id,
+    name: r.name,
+    latitude: r.latitude,
+    longitude: r.longitude,
+    locality: r.locality,
+    region: r.region,
+    country: r.country,
+    website: r.website,
+    belief_type: r.belief_type,
+    service_languages: Array.isArray(r.service_languages) ? r.service_languages : null,
+    geojson: null,
+  }))
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
@@ -23,32 +40,18 @@ export default function Page() {
         </Link>
         <h1 className="text-2xl font-bold text-gray-900 mb-4">Global.Church Index</h1>
         
-        {/* Map Button */}
-        <Link 
-          href="/map"
-          className="inline-flex items-center gap-2 bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
-        >
-          <MapPin size={18} />
-          View Map
-        </Link>
+        {/* Map Button removed per new unified Explore page */}
       </div>
 
-      {/* Search Bar */}
-      <MobileSearch context="home" />
+      {/* Search Bar removed; search lives inside NearbyResults */}
 
       {/* Main Content */}
-      <div className="px-4 py-6 space-y-8">
-        <section className="space-y-2 text-center">
-          <h2 className="text-2xl font-semibold">Find churches near you</h2>
-          <p className="text-sm text-gray-600">
-            We’ll use your device’s location (with your permission) to show nearby churches.
-          </p>
-          <div className="flex justify-center">
-            <div className="w-full max-w-3xl">
-              <NearbyResults />
-            </div>
+      <div className="px-4 py-6">
+        <div className="flex justify-center">
+          <div className="w-full max-w-5xl">
+            <NearbyResults initialPins={initialPins} />
           </div>
-        </section>
+        </div>
       </div>
 
       {/* Mobile Navigation */}

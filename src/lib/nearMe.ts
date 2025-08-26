@@ -1,5 +1,5 @@
 // src/lib/nearMe.ts
-import { supabase } from "@/lib/supabase";
+import { searchChurchesByRadius } from "@/lib/zuplo";
 
 export type NearbyChurch = {
   church_id: string;
@@ -22,13 +22,15 @@ export async function fetchNearbyChurches(
   radiusKm = 25,
   maxResults = 50
 ): Promise<NearbyChurch[]> {
-  const { data, error } = await supabase.rpc("churches_nearby", {
-    user_lat: lat,
-    user_lng: lng,
+  const results = await searchChurchesByRadius({
+    center_lat: lat,
+    center_lng: lng,
     radius_km: radiusKm,
-    max_results: maxResults,
+    limit: maxResults,
   });
 
-  if (error) throw error;
-  return (data ?? []) as NearbyChurch[];
+  return results.map((church) => ({
+    ...church,
+    distance_km: church.distance_m / 1000,
+  })) as unknown as NearbyChurch[];
 }

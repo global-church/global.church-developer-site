@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,7 @@ export default function LanguageFilterButton() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<Set<LanguageValue>>(new Set())
+  const containerRef = useRef<HTMLDivElement | null>(null)
   const router = useRouter()
   const sp = useSearchParams()
   const pathname = usePathname()
@@ -36,6 +37,19 @@ export default function LanguageFilterButton() {
     if (!q) return LANGUAGE_OPTIONS
     return (LANGUAGE_OPTIONS as readonly string[]).filter((l) => l.toLowerCase().includes(q))
   }, [query])
+
+  // Outside click – close popover
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!open) return
+      const el = containerRef.current
+      if (el && e.target instanceof Node && !el.contains(e.target)) {
+        apply()
+      }
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [open])
 
   function toggle(value: LanguageValue) {
     setSelected((prev) => {
@@ -68,7 +82,7 @@ export default function LanguageFilterButton() {
   const count = selected.size
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <Button
         variant="outline"
         onClick={() => setOpen((v) => !v)}
@@ -79,7 +93,7 @@ export default function LanguageFilterButton() {
       </Button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3">
+        <div className="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-[1000] p-3">
           <div className="mb-2">
             <Input
               value={query}
@@ -118,5 +132,7 @@ export default function LanguageFilterButton() {
     </div>
   )
 }
+// Add outside click to close
+// effect must be inside component. Injected near the top of the component for clarity
 
 
