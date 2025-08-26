@@ -8,19 +8,8 @@ const HEADERS = {
   Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
 };
 
-function looksUnavailable(html: string): boolean {
-  const needles = [
-    /page isn't available/i,
-    /page isn[’']t available/i,
-    /this content isn't available/i,
-    /this content isn[’']t available/i,
-    /page not found/i,
-    /the link you followed may be broken/i,
-    /content not found/i,
-    /unavailable/i,
-  ];
-  return needles.some(re => re.test(html));
-}
+// reserved for future heuristics; avoid unused-var warning
+const looksUnavailable: ((html: string) => boolean) | undefined = undefined;
 
 export const revalidate = 0; // do not cache at the route level; we set Cache-Control manually
 

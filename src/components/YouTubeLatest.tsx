@@ -27,14 +27,20 @@ export default function YouTubeLatest({ youtubeUrl, max = 6, wrap = false, title
         const res = await fetch(`/api/youtube/latest?youtube_url=${encodeURIComponent(youtubeUrl)}&max=${max}&resolver=2`, { cache: 'no-store' });
         const data: unknown = await res.json();
         if (!res.ok) {
-          const message = (typeof data === 'object' && data && 'error' in (data as any) && typeof (data as any).error === 'string') ? (data as any).error : 'Failed to load videos';
+          const message = (() => {
+            if (data && typeof data === 'object' && 'error' in (data as Record<string, unknown>)) {
+              const maybe = (data as Record<string, unknown>).error;
+              if (typeof maybe === 'string') return maybe;
+            }
+            return 'Failed to load videos';
+          })();
           if (res.status === 404 || /Unable to resolve channelId/i.test(String(message))) {
             if (!cancelled) setNotFound(true);
             return;
           }
           throw new Error(message);
         }
-        if (!cancelled) setItems((data as { items: VideoItem[] }).items);
+        if (!cancelled) setItems(((data as { items?: VideoItem[] }).items) ?? []);
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'Unknown error';
         if (!cancelled) setErr(message);

@@ -1,5 +1,5 @@
 // src/hooks/useGeolocation.ts
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 type GeoState = {
   coords: { lat: number; lng: number } | null;

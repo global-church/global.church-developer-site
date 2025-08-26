@@ -57,7 +57,8 @@ export default function BeliefFilterButton() {
     setOpen(false)
   }
 
-  function clear() {
+  // Keep clear function but use internally when needed (not exposed in UI currently)
+  const clear = () => {
     setSelected(new Set())
     const params = new URLSearchParams(sp.toString())
     params.delete('belief')
@@ -84,7 +85,7 @@ export default function BeliefFilterButton() {
     }
     document.addEventListener('mousedown', onDocClick)
     return () => document.removeEventListener('mousedown', onDocClick)
-  }, [open])
+  }, [open, apply])
 
   return (
     <div className="relative" ref={containerRef}>

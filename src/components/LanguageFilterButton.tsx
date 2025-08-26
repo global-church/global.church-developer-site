@@ -49,7 +49,7 @@ export default function LanguageFilterButton() {
     }
     document.addEventListener('mousedown', onDocClick)
     return () => document.removeEventListener('mousedown', onDocClick)
-  }, [open])
+  }, [open, apply])
 
   function toggle(value: LanguageValue) {
     setSelected((prev) => {

@@ -408,11 +408,16 @@ export default function LeafletMapInner({
 
       // Fit tightly with padding so pins fill ~80% inner area; explicitly cap max zoom for a tighter view
       const bounds: [[number, number], [number, number]] = [[minLat, minLng], [maxLat, maxLng]]
-      if ((map as unknown as { flyToBounds?: Function }).flyToBounds) {
-        ;(map as unknown as { flyToBounds: (b: typeof bounds, o: { paddingTopLeft: [number, number]; paddingBottomRight: [number, number]; maxZoom: number; animate: boolean }) => void })
-          .flyToBounds(bounds, { paddingTopLeft: [padX, padY], paddingBottomRight: [padX, padY], maxZoom: 18, animate: true })
+      const opts = { paddingTopLeft: [padX, padY] as [number, number], paddingBottomRight: [padX, padY] as [number, number], maxZoom: 18, animate: true }
+      const leafMap = map as unknown as {
+        flyToBounds?: (b: typeof bounds, o: typeof opts) => void
+        fitBounds: (b: typeof bounds, o: typeof opts) => void
+      }
+      if (typeof leafMap.flyToBounds === 'function') {
+        // Call as a method to preserve Leaflet's internal `this` binding
+        leafMap.flyToBounds(bounds, opts)
       } else {
-        map.fitBounds(bounds, { paddingTopLeft: [padX, padY], paddingBottomRight: [padX, padY], maxZoom: 18, animate: true })
+        leafMap.fitBounds(bounds, opts)
       }
       lastAppliedFitKeyRef.current = triggerKey
     }, [triggerKey, map])

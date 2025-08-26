@@ -119,7 +119,7 @@ export default function NearbyResults({ initialPins = [] as Array<{ church_id: s
       return beliefOk && languageOk;
     });
     setResults(filtered);
-  }, [baseResults, spKey]);
+  }, [baseResults, sp]);
 
   // Increment fitKey when filters/search results change, to trigger a one-time map fit
   useEffect(() => {
