@@ -14,6 +14,60 @@ import ServiceDayFilter from "@/components/explorer/filters/ServiceDayFilter";
 import ServiceTimeFilter from "./filters/ServiceTimeFilter";
 import ProgramsFilter from "./filters/ProgramsFilter";
 
+// Local helpers (module scope) to keep hook deps stable
+type ParsedService = { day: string; time: string; description?: string };
+const DAY_NAME_MAP: Record<string, string> = {
+  sun: "Sunday",
+  mon: "Monday",
+  tue: "Tuesday",
+  wed: "Wednesday",
+  thu: "Thursday",
+  fri: "Friday",
+  sat: "Saturday",
+};
+
+function to24Hour(timeStr: string): string | null {
+  const re = /^(\d{1,2}):(\d{2})\s*(am|pm)?$/i;
+  const m = timeStr.trim().match(re);
+  if (!m) return null;
+  let hours = parseInt(m[1] || "0", 10);
+  const minutes = parseInt(m[2] || "0", 10);
+  const ampm = (m[3] || "").toLowerCase();
+  if (ampm === "pm" && hours < 12) hours += 12;
+  if (ampm === "am" && hours === 12) hours = 0;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  const hh = String(hours).padStart(2, "0");
+  const mm = String(minutes).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+function parseServicesInfoStable(church: { services_info?: string | null }): ParsedService[] {
+  const raw = church?.services_info ?? null;
+  if (!raw) return [];
+  let items: string[] = [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) items = parsed.map((v) => String(v));
+    else if (typeof parsed === "string") items = [parsed];
+    else items = [];
+  } catch {
+    if (typeof raw === "string" && raw.length > 0) items = [raw];
+  }
+  const re = /(Sun|Mon|Tue|Wed|Thu|Fri|Sat)\b[^\d]*(\d{1,2}:\d{2})(?:\s*(AM|PM))?/i;
+  const parsed: ParsedService[] = [];
+  for (const item of items) {
+    const m = String(item).match(re);
+    if (!m) continue;
+    const dayAbbrev = (m[1] || "").slice(0, 3).toLowerCase();
+    const timeRaw = `${m[2]}${m[3] ? ` ${m[3]}` : ""}`.trim();
+    const time24 = to24Hour(timeRaw);
+    const day = DAY_NAME_MAP[dayAbbrev] || "";
+    if (!day || !time24) continue;
+    parsed.push({ day, time: time24, description: String(item) });
+  }
+  return parsed;
+}
+
 export default function ExplorerClient({ initialPins = [] as Array<{ church_id: string; name: string; latitude: number; longitude: number; locality: string | null; region: string | null; country: string; website: string | null; belief_type?: string | null; service_languages?: string[] | null; geojson?: { type: 'Point'; coordinates: [number, number] } | null }>} : { initialPins?: Array<{ church_id: string; name: string; latitude: number; longitude: number; locality: string | null; region: string | null; country: string; website: string | null; belief_type?: string | null; service_languages?: string[] | null; geojson?: { type: 'Point'; coordinates: [number, number] } | null }> }) {
   const initialNearbyChurches = useMemo(() => {
     const allowed = new Set(['orthodox','roman_catholic','protestant','anglican','other','unknown']);
@@ -149,69 +203,14 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
 
   
 
-  type ParsedService = { day: string; time: string; description?: string };
-  const dayNameMap: Record<string, string> = {
-    sun: "Sunday",
-    mon: "Monday",
-    tue: "Tuesday",
-    wed: "Wednesday",
-    thu: "Thursday",
-    fri: "Friday",
-    sat: "Saturday",
-  };
-
-  const to24Hour = (timeStr: string): string | null => {
-    // Accept formats like 9:00, 09:00, 9:00 AM, 9:00PM
-    const re = /^(\d{1,2}):(\d{2})\s*(am|pm)?$/i;
-    const m = timeStr.trim().match(re);
-    if (!m) return null;
-    let hours = parseInt(m[1] || "0", 10);
-    const minutes = parseInt(m[2] || "0", 10);
-    const ampm = (m[3] || "").toLowerCase();
-    if (ampm === "pm" && hours < 12) hours += 12;
-    if (ampm === "am" && hours === 12) hours = 0;
-    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
-    const hh = String(hours).padStart(2, "0");
-    const mm = String(minutes).padStart(2, "0");
-    return `${hh}:${mm}`;
-  };
-
-  const parseServicesInfo = (church: NearbyChurch & { services_info?: string | null }): ParsedService[] => {
-    const raw = church?.services_info ?? null;
-    if (!raw) return [];
-    let items: string[] = [];
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) items = parsed.map((v) => String(v));
-      else if (typeof parsed === "string") items = [parsed];
-      else items = [];
-    } catch {
-      // If not JSON, try to treat as a single string
-      if (typeof raw === "string" && raw.length > 0) items = [raw];
-    }
-    const re = /(Sun|Mon|Tue|Wed|Thu|Fri|Sat)\b[^\d]*(\d{1,2}:\d{2})(?:\s*(AM|PM))?/i;
-    const parsed: ParsedService[] = [];
-    for (const item of items) {
-      const m = String(item).match(re);
-      if (!m) continue;
-      const dayAbbrev = (m[1] || "").slice(0, 3).toLowerCase();
-      const timeRaw = `${m[2]}${m[3] ? ` ${m[3]}` : ""}`.trim();
-      const time24 = to24Hour(timeRaw);
-      const day = dayNameMap[dayAbbrev] || "";
-      if (!day || !time24) continue;
-      parsed.push({ day, time: time24, description: String(item) });
-    }
-    return parsed;
-  };
-
   const churchIdToServices = useMemo(() => {
     const map = new Map<string, ParsedService[]>();
     for (const r of baseResults) {
-      const arr = parseServicesInfo(r as NearbyChurch & { services_info?: string | null });
+      const arr = parseServicesInfoStable(r as { services_info?: string | null });
       map.set(r.church_id, arr);
     }
     return map;
-  }, [baseResults, parseServicesInfo]);
+  }, [baseResults]);
 
   const timeWithinRange = (time: string, start: string | null, end: string | null): boolean => {
     if (!start && !end) return true;
