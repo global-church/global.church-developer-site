@@ -188,6 +188,46 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPins, spKey, pinsFromResults.length])
 
+  const toChurchPublicFromInitial = (p: { church_id: string; name: string; latitude: number; longitude: number; locality: string | null; region: string | null; country: string; website: string | null; belief_type?: string | null; service_languages?: string[] | null; geojson?: { type: 'Point'; coordinates: [number, number] } | null }): ChurchPublic => ({
+    church_id: p.church_id,
+    gers_id: null,
+    name: p.name,
+    latitude: p.latitude,
+    longitude: p.longitude,
+    address: null,
+    locality: p.locality,
+    region: p.region,
+    postal_code: null,
+    country: p.country,
+    website: p.website,
+    website_root: null,
+    pipeline_status: null,
+    search_blob: null,
+    belief_type: (p as any).belief_type ?? null,
+    trinitarian_beliefs: null,
+    church_beliefs_url: null,
+    services_info: null,
+    service_languages: Array.isArray(p.service_languages) ? p.service_languages : null,
+    instagram_url: null,
+    youtube_url: null,
+    social_media: null,
+    scraped_email: null,
+    phone: null,
+    church_phone: null,
+    giving_url: null,
+    scraped_address: null,
+    programs_offered: null,
+    church_summary: null,
+    geo: null,
+    geojson: p.geojson ?? { type: 'Point', coordinates: [p.longitude, p.latitude] },
+  });
+
+  const filteredInitialPinsForMap: ChurchPublic[] = useMemo(
+    () => (pinsFromResults.length > 0 ? [] : filteredInitialPins.map(toChurchPublicFromInitial)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredInitialPins, pinsFromResults.length]
+  );
+
   return (
     <section className="space-y-6">
       {/* Filters row */}
@@ -303,7 +343,7 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
 
       {/* Map mirrors current filters/search results */}
       <div className="h-[420px] w-full rounded-xl overflow-hidden border">
-        <ChurchMap pins={pinsFromResults.length > 0 ? pinsFromResults : filteredInitialPins} fitKey={fitKey} />
+        <ChurchMap pins={pinsFromResults.length > 0 ? pinsFromResults : filteredInitialPinsForMap} fitKey={fitKey} />
       </div>
     </section>
   );
