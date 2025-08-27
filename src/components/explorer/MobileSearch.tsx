@@ -120,7 +120,7 @@ export default function MobileSearch({ context = 'home', initialQuery = '' }: Mo
                 className="px-3 py-1.5 text-sm"
               >
                 <Filter size={16} className="mr-2" />
-                Filter By Type{selectedCount ? ` (${selectedCount})` : ''}
+                Type{selectedCount ? ` (${selectedCount})` : ''}
               </Button>
 
               {filterOpen && (

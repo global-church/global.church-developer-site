@@ -98,7 +98,7 @@ export default function BeliefFilterButton() {
         className="px-3 py-1.5 text-sm"
       >
         <Filter size={16} className="mr-2" />
-        Filter By Type{count ? ` (${count})` : ''}
+        Type{count ? ` (${count})` : ''}
       </Button>
 
       {open && (

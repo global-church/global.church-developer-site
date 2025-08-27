@@ -11,26 +11,26 @@ const LeafletMapInner = dynamic(() => import('./LeafletMapInner'), {
 	pins: ChurchPublic[]
 	center?: [number, number]
 	zoom?: number
-	filters?: { q?: string; belief?: string; region?: string; country?: string; language?: string }
 	fitKey?: number
+	disableViewportFetch?: boolean
 }>
 
 export default function ChurchMap({
 	pins,
 	center = [25, 10],
 	zoom = 2,
-	filters,
 	fitKey,
+	disableViewportFetch = false,
 }: {
 	pins: ChurchPublic[]
 	center?: [number, number]
 	zoom?: number
-	filters?: { q?: string; belief?: string; region?: string; country?: string; language?: string }
 	fitKey?: number
+	disableViewportFetch?: boolean
 }) {
 	return (
 		<div className="relative h-full w-full z-0">
-			<LeafletMapInner pins={pins} center={center} zoom={zoom} filters={filters} fitKey={fitKey} />
+			<LeafletMapInner pins={pins} center={center} zoom={zoom} fitKey={fitKey} disableViewportFetch={disableViewportFetch} />
 		</div>
 	)
 }

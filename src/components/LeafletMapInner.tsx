@@ -26,6 +26,7 @@ export default function LeafletMapInner({
 	center = [25, 10],
 	zoom = 3,
 	fitKey,
+	disableViewportFetch = false,
 }: {
 	pins: {
 		church_id: string
@@ -43,6 +44,7 @@ export default function LeafletMapInner({
 	center?: [number, number]
 	zoom?: number
 	fitKey?: number
+	disableViewportFetch?: boolean
 }) {
 	const [blackPinIcon, setBlackPinIcon] = useState<DivIcon | null>(null)
   const [clusterIndex, setClusterIndex] = useState<Supercluster | null>(null)
@@ -263,6 +265,7 @@ export default function LeafletMapInner({
 
   // Debounced viewport fetch using public RPC churches_in_bbox
   useEffect(() => {
+    if (disableViewportFetch) return
     if (!bounds) return
 
     // Compute spans and skip overly large bboxes
@@ -339,7 +342,7 @@ export default function LeafletMapInner({
       // Increment requestId to invalidate any pending resolution
       requestIdRef.current += 1
     }
-  }, [bounds])
+  }, [bounds, disableViewportFetch])
 
   function MapStateSyncCore({ onChange, padding = 0.75 }: { onChange: (map: ReturnType<typeof useMap>, padding?: number) => void; padding?: number }) {
     const map = useMap()
