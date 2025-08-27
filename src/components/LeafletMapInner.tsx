@@ -420,7 +420,7 @@ export default function LeafletMapInner({
         leafMap.fitBounds(bounds, opts)
       }
       lastAppliedFitKeyRef.current = triggerKey
-    }, [triggerKey, map])
+    }, [triggerKey, map, pinsToFit])
     return null
   }
 

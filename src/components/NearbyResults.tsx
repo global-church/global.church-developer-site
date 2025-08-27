@@ -124,7 +124,6 @@ export default function NearbyResults({ initialPins = [] as Array<{ church_id: s
   // Increment fitKey when filters/search results change, to trigger a one-time map fit
   useEffect(() => {
     setFitKey((k) => k + 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spKey, resultsKey]);
 
   // On initial mount/refresh: clear filter params so a hard reload resets filters
