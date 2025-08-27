@@ -25,7 +25,7 @@ export default function LeafletMapInner({
 	pins,
 	center = [25, 10],
 	zoom = 3,
-	filters,
+	filters: _filters,
 	fitKey,
 }: {
 	pins: {

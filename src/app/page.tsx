@@ -20,7 +20,7 @@ export default function Page() {
             Uniting the Global Church, One API at a Time.
           </h1>
           <p className="mt-4 text-lg text-gray-600 max-w-3xl mx-auto">
-            We're building an open-source data schema and a powerful API to help developers connect people with local churches worldwide.
+            We&#39;re building an open-source data schema and a powerful API to help developers connect people with local churches worldwide.
           </p>
           <div className="mt-8 flex justify-center gap-4">
             <Link href="/api-docs" passHref>

@@ -4,7 +4,7 @@ export default function ContactPage() {
   return (
     <ContentPage title="Contact Us">
       <p>
-        We'd love to hear from you. Please direct your inquiries to the appropriate email address below, and we'll get back to you as soon as we can.
+        We&#39;d love to hear from you. Please direct your inquiries to the appropriate email address below, and we&#39;ll get back to you as soon as we can.
       </p>
       <div className="mt-8 space-y-4">
         <div>
