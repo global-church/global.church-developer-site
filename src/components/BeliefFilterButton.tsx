@@ -60,6 +60,7 @@ export default function BeliefFilterButton() {
   }, [pathname, router, selected, sp])
 
   // Keep clear function but use internally when needed (not exposed in UI currently)
+  // expose "Clear" in the UI so the function is used and lint stays clean
   const clear = () => {
     setSelected(new Set())
     const params = new URLSearchParams(sp.toString())
@@ -121,6 +122,7 @@ export default function BeliefFilterButton() {
             })}
           </div>
           <div className="flex justify-end gap-2 pt-3">
+            <Button variant="outline" size="sm" onClick={clear}>Clear</Button>
             <Button variant="outline" size="sm" onClick={selectAll}>Select All</Button>
             <Button size="sm" onClick={apply}>Apply</Button>
           </div>
