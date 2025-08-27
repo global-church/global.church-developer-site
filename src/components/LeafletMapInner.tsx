@@ -25,7 +25,6 @@ export default function LeafletMapInner({
 	pins,
 	center = [25, 10],
 	zoom = 3,
-	filters: _filters,
 	fitKey,
 }: {
 	pins: {
@@ -43,7 +42,6 @@ export default function LeafletMapInner({
 	}[]
 	center?: [number, number]
 	zoom?: number
-	filters?: { q?: string; belief?: string; region?: string; country?: string; language?: string }
 	fitKey?: number
 }) {
 	const [blackPinIcon, setBlackPinIcon] = useState<DivIcon | null>(null)

@@ -15,7 +15,7 @@ export default function ApiPage() {
               Access a growing global database of church information through our powerful, developer-friendly API, built with Zuplo.
             </p>
             <p>
-              Our API provides robust endpoints for searching, filtering, and retrieving church data based on location, belief type, service languages, and more. It's the engine that powers our Explorer tool and is available for you to integrate into your own applications.
+              Our API provides robust endpoints for searching, filtering, and retrieving church data based on location, belief type, service languages, and more. It&#39;s the engine that powers our Explorer tool and is available for you to integrate into your own applications.
             </p>
             <p>
               Explore the interactive API playground to test queries, view responses, and get the code snippets you need to get started quickly.
