@@ -7,7 +7,7 @@ import BeliefFilterButton from "@/components/BeliefFilterButton";
 import LanguageFilterButton from "@/components/LanguageFilterButton";
 import { NearMeButton } from "@/components/NearMeButton";
 import { fetchNearbyChurches, NearbyChurch } from "@/lib/nearMe";
-import type { ChurchPublic } from "@/lib/types";
+import type { ChurchPublic, BeliefType } from "@/lib/types";
 import { useRouter, useSearchParams } from "next/navigation";
 
 export default function ExplorerClient({ initialPins = [] as Array<{ church_id: string; name: string; latitude: number; longitude: number; locality: string | null; region: string | null; country: string; website: string | null; belief_type?: string | null; service_languages?: string[] | null; geojson?: { type: 'Point'; coordinates: [number, number] } | null }>} : { initialPins?: Array<{ church_id: string; name: string; latitude: number; longitude: number; locality: string | null; region: string | null; country: string; website: string | null; belief_type?: string | null; service_languages?: string[] | null; geojson?: { type: 'Point'; coordinates: [number, number] } | null }> }) {
@@ -172,10 +172,10 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
     setInitialPinsLoaded(true);
   }
 
+  const beliefParam = sp.get('belief') || ''
+  const languageParam = sp.get('language') || ''
   const filteredInitialPins = useMemo(() => {
     if (pinsFromResults.length > 0) return []
-    const beliefParam = sp.get('belief') || ''
-    const languageParam = sp.get('language') || ''
     const beliefs = beliefParam.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
     const languages = languageParam.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
     if (beliefs.length === 0 && languages.length === 0) return initialPins
@@ -185,7 +185,13 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
       const languageOk = languages.length === 0 || languages.some((lang) => langs.includes(lang))
       return beliefOk && languageOk
     })
-  }, [initialPins, spKey, pinsFromResults.length])
+  }, [initialPins, beliefParam, languageParam, pinsFromResults.length])
+
+  const toBeliefType = (v: string | null | undefined): BeliefType | null => {
+    const allowed: BeliefType[] = ['orthodox','roman_catholic','protestant','anglican','other','unknown']
+    const val = (v || '').toLowerCase() as BeliefType
+    return allowed.includes(val) ? val : null
+  }
 
   const toChurchPublicFromInitial = (p: { church_id: string; name: string; latitude: number; longitude: number; locality: string | null; region: string | null; country: string; website: string | null; belief_type?: string | null; service_languages?: string[] | null; geojson?: { type: 'Point'; coordinates: [number, number] } | null }): ChurchPublic => ({
     church_id: p.church_id,
@@ -202,7 +208,7 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
     website_root: null,
     pipeline_status: null,
     search_blob: null,
-    belief_type: p.belief_type ?? null,
+    belief_type: toBeliefType(p.belief_type ?? null),
     trinitarian_beliefs: null,
     church_beliefs_url: null,
     services_info: null,
