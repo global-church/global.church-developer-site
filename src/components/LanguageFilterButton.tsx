@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,6 +38,17 @@ export default function LanguageFilterButton() {
     return (LANGUAGE_OPTIONS as readonly string[]).filter((l) => l.toLowerCase().includes(q))
   }, [query])
 
+  // Apply current selection to URL (declare before effects that depend on it)
+  const apply = useCallback(() => {
+    const params = new URLSearchParams(sp.toString())
+    const csv = Array.from(selected).join(',')
+    if (csv) params.set('language', csv)
+    else params.delete('language')
+    const qs = params.toString()
+    router.push(qs ? `${pathname}?${qs}` : pathname)
+    setOpen(false)
+  }, [pathname, router, selected, sp])
+
   // Outside click – close popover
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -60,15 +71,7 @@ export default function LanguageFilterButton() {
     })
   }
 
-  function apply() {
-    const params = new URLSearchParams(sp.toString())
-    const csv = Array.from(selected).join(',')
-    if (csv) params.set('language', csv)
-    else params.delete('language')
-    const qs = params.toString()
-    router.push(qs ? `${pathname}?${qs}` : pathname)
-    setOpen(false)
-  }
+  
 
   function clear() {
     setSelected(new Set())

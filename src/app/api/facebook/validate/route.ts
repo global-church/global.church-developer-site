@@ -8,7 +8,8 @@ const HEADERS = {
   Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
 };
 
-// reserved for future heuristics; avoid unused-var warning
+// reserved for future heuristics; keep as a const to avoid unused-var rule
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const looksUnavailable: ((html: string) => boolean) | undefined = undefined;
 
 export const revalidate = 0; // do not cache at the route level; we set Cache-Control manually

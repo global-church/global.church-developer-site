@@ -15,6 +15,8 @@ const BELIEF_OPTIONS = [
 
 type BeliefValue = typeof BELIEF_OPTIONS[number]['value']
 
+import { useCallback } from 'react'
+
 export default function BeliefFilterButton() {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -47,7 +49,7 @@ export default function BeliefFilterButton() {
     })
   }
 
-  function apply() {
+  const apply = useCallback(() => {
     const params = new URLSearchParams(sp.toString())
     const csv = Array.from(selected).join(',')
     if (csv) params.set('belief', csv)
@@ -55,7 +57,7 @@ export default function BeliefFilterButton() {
     const qs = params.toString()
     router.push(qs ? `${pathname}?${qs}` : pathname)
     setOpen(false)
-  }
+  }, [pathname, router, selected, sp])
 
   // Keep clear function but use internally when needed (not exposed in UI currently)
   const clear = () => {
