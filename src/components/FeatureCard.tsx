@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowRight } from "lucide-react"
+// Removed unused import
 import type { ReactNode } from "react"
 
 interface FeatureCardProps {

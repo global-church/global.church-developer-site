@@ -1,5 +1,6 @@
 // src/lib/nearMe.ts
 import { searchChurchesByRadius } from "@/lib/zuplo";
+import type { ChurchWithinRadiusRow } from "@/lib/types";
 
 export type NearbyChurch = {
   church_id: string;
@@ -42,12 +43,13 @@ export async function fetchNearbyChurches(
   };
 
   // Be resilient to different distance fields from API (distance_km, distance_m, distance). Fallback to haversine.
-  const toKm = (row: any): number | null => {
-    const km = asNumber(row?.distance_km);
+  type RowWithDistance = Partial<ChurchWithinRadiusRow> & { distance?: number | string };
+  const toKm = (row: RowWithDistance): number | null => {
+    const km = asNumber((row as { distance_km?: unknown }).distance_km);
     if (km !== null) return km;
-    const m = asNumber(row?.distance_m);
+    const m = asNumber((row as { distance_m?: unknown }).distance_m);
     if (m !== null) return m / 1000;
-    const d = asNumber(row?.distance);
+    const d = asNumber((row as { distance?: unknown }).distance);
     if (d !== null) return d; // assume already in km
     return null;
   };
@@ -64,10 +66,11 @@ export async function fetchNearbyChurches(
     return R * c;
   };
 
-  return results.map((church: any) => {
-    const apiKm = toKm(church);
-    const lat2 = asNumber(church?.latitude);
-    const lng2 = asNumber(church?.longitude);
+  const rows = results as Array<RowWithDistance>;
+  return rows.map((church) => {
+    const apiKm = toKm(church as RowWithDistance);
+    const lat2 = asNumber((church as { latitude?: unknown }).latitude);
+    const lng2 = asNumber((church as { longitude?: unknown }).longitude);
     const fallbackKm = lat2 !== null && lng2 !== null ? haversineKm(lat, lng, lat2, lng2) : 0;
     return {
       ...church,

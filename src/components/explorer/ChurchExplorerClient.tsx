@@ -211,7 +211,7 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
       map.set(r.church_id, arr);
     }
     return map;
-  }, [baseResults]);
+  }, [baseResults, parseServicesInfo]);
 
   const timeWithinRange = (time: string, start: string | null, end: string | null): boolean => {
     if (!start && !end) return true;
