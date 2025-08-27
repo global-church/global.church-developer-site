@@ -185,7 +185,6 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
       const languageOk = languages.length === 0 || languages.some((lang) => langs.includes(lang))
       return beliefOk && languageOk
     })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPins, spKey, pinsFromResults.length])
 
   const toChurchPublicFromInitial = (p: { church_id: string; name: string; latitude: number; longitude: number; locality: string | null; region: string | null; country: string; website: string | null; belief_type?: string | null; service_languages?: string[] | null; geojson?: { type: 'Point'; coordinates: [number, number] } | null }): ChurchPublic => ({
@@ -203,7 +202,7 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
     website_root: null,
     pipeline_status: null,
     search_blob: null,
-    belief_type: (p as any).belief_type ?? null,
+    belief_type: p.belief_type ?? null,
     trinitarian_beliefs: null,
     church_beliefs_url: null,
     services_info: null,
@@ -224,7 +223,6 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
 
   const filteredInitialPinsForMap: ChurchPublic[] = useMemo(
     () => (pinsFromResults.length > 0 ? [] : filteredInitialPins.map(toChurchPublicFromInitial)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [filteredInitialPins, pinsFromResults.length]
   );
 
