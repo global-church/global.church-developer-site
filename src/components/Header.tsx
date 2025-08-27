@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 
 const navLinks = [
-  { href: "/explorer", label: "Explorer" },
+  { href: "/explorer", label: "Church Explorer" },
   { href: "/schema", label: "Schema" },
   { href: "/api-docs", label: "API" },
   { href: "/mcp-server", label: "MCP Server" },
@@ -23,7 +24,13 @@ export default function Header() {
     <header className="py-4 px-6 md:px-8 border-b border-gray-200">
       <nav className="flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
-          <span className="font-semibold text-lg">Global.Church</span>
+          <Image
+            src="/gc-logo.png"
+            alt="Global.Church Logo"
+            width={180}
+            height={40}
+            priority
+          />
         </Link>
 
         <div className="hidden md:flex items-center gap-6">
@@ -34,7 +41,7 @@ export default function Header() {
                 key={link.href}
                 href={link.href}
                 className={`text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors ${
-                  isActive ? "text-green-600" : ""
+                  isActive ? "text-primary" : ""
                 }`}
               >
                 {link.label}
@@ -58,7 +65,13 @@ export default function Header() {
           <div className="flex flex-col h-full">
             <div className="flex items-center justify-between py-4 px-6 border-b">
               <Link href="/" className="flex items-center gap-2" onClick={() => setIsMenuOpen(false)}>
-                <span className="font-semibold text-lg">Global.Church</span>
+                <Image
+                  src="/gc-logo.png"
+                  alt="Global.Church Logo"
+                  width={180}
+                  height={40}
+                  priority
+                />
               </Link>
               <button
                 type="button"

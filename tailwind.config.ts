@@ -4,6 +4,10 @@ const config: Config = {
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['var(--font-onest)'],
+        display: ['var(--font-instrument-sans)'],
+      },
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",

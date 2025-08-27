@@ -12,7 +12,7 @@ export function NearMeButton({ onLocated, label }: { onLocated: (coords: {lat:nu
 
   return (
     <div className="flex items-center gap-2">
-      <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={request} disabled={loading}>
+      <button className="px-3 py-2 rounded bg-primary text-white" onClick={request} disabled={loading}>
         {loading ? "Locating…" : (label ?? "Use my location")}
       </button>
       {error && <span className="text-sm text-red-600">{error}</span>}

@@ -107,7 +107,7 @@ export default function MobileSearch({ context = 'home', initialQuery = '' }: Mo
         </div>
         <Button
           onClick={handleSearch}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-lg text-sm"
+          className="bg-primary hover:bg-primary/90 text-white px-4 py-1.5 rounded-lg text-sm"
         >
           Search
         </Button>

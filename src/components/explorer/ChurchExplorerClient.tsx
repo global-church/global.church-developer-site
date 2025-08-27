@@ -285,10 +285,10 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
           const languages = extractLanguages(r);
           const beliefPretty = formatBelief(r.belief_type ?? null);
           return (
-            <li key={r.church_id} className="rounded-xl border">
+            <li key={r.church_id} className="rounded-lg border bg-white">
               <a href={`/church/${r.church_id}`} className="block p-4 group">
                 <div className="flex items-start gap-3">
-                  <div className="size-12 rounded-full bg-gradient-to-br from-teal-200 to-blue-300 grid place-items-center text-lg font-semibold text-slate-800 flex-shrink-0">
+                  <div className="size-12 rounded-full bg-primary grid place-items-center text-lg font-semibold text-white flex-shrink-0">
                     {r.name?.charAt(0).toUpperCase() ?? "C"}
                   </div>
                   <div className="flex-1 min-w-0">

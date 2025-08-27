@@ -14,10 +14,10 @@ export default function Page() {
   return (
     <div>
       {/* Hero Section */}
-      <section className="py-16 md:py-24">
+      <section className="py-20 md:py-28">
         <div className="container mx-auto px-4 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-gray-900">
-            Uniting the Global Church, One API at a Time.
+          <h1 className="text-5xl md:text-6xl leading-tight font-bold tracking-tight text-gray-900">
+            Uniting the Global Church,<br />one API at a time.
           </h1>
           <p className="mt-4 text-lg text-gray-600 max-w-3xl mx-auto">
             We&#39;re building an open-source data schema and a powerful API to help developers connect people with local churches worldwide.
@@ -34,8 +34,11 @@ export default function Page() {
       </section>
 
       {/* Features Section */}
-      <section className="bg-gray-50 py-16 md:py-24">
+      <section className="bg-white py-16 md:py-24">
         <div className="container mx-auto px-4">
+          <p className="text-lg text-gray-700 max-w-3xl mx-auto text-center mb-12">
+            Global.Church is a mission-driven digital platform aligned with the Great Commission to reach all nations. Its focus is on catalyzing collaboration, discipleship, and action towards this mission and has set out to make the following capabilities available for the global Church:
+          </p>
           <h2 className="text-3xl font-bold text-center mb-12">A Platform for FaithTech Innovators</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <FeatureCard
@@ -52,8 +55,8 @@ export default function Page() {
             />
             <FeatureCard
               icon={<MapPin size={24} />}
-              title="Live Explorer"
-              description="See the API in action with our explorer tool, built on the very platform you can use."
+              title="Live Church Explorer"
+              description="See the API in action with our Church Explorer tool, built on the very platform you can use."
               href="/explorer"
             />
           </div>

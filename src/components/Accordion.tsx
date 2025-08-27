@@ -23,9 +23,9 @@ export default function Accordion({ items }: { items: AccordionItemProps[] }) {
             onClick={() => handleClick(index)}
             aria-expanded={openIndex === index}
           >
-            <span className="text-lg font-medium text-gray-900">{item.question}</span>
+            <span className="text-xl font-medium text-gray-900 font-display">{item.question}</span>
             <ChevronDown
-              className={`size-5 transform transition-transform ${openIndex === index ? 'rotate-180' : ''}`}
+              className={`size-5 transform transition-transform text-primary ${openIndex === index ? 'rotate-180' : ''}`}
             />
           </button>
           {openIndex === index && (
