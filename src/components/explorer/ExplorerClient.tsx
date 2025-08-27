@@ -7,6 +7,7 @@ import BeliefFilterButton from "@/components/BeliefFilterButton";
 import LanguageFilterButton from "@/components/LanguageFilterButton";
 import { NearMeButton } from "@/components/NearMeButton";
 import { fetchNearbyChurches, NearbyChurch } from "@/lib/nearMe";
+import type { ChurchPublic } from "@/lib/types";
 import { useRouter, useSearchParams } from "next/navigation";
 
 export default function ExplorerClient({ initialPins = [] as Array<{ church_id: string; name: string; latitude: number; longitude: number; locality: string | null; region: string | null; country: string; website: string | null; belief_type?: string | null; service_languages?: string[] | null; geojson?: { type: 'Point'; coordinates: [number, number] } | null }>} : { initialPins?: Array<{ church_id: string; name: string; latitude: number; longitude: number; locality: string | null; region: string | null; country: string; website: string | null; belief_type?: string | null; service_languages?: string[] | null; geojson?: { type: 'Point'; coordinates: [number, number] } | null }> }) {
@@ -127,21 +128,45 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
     }
   }, [router, sp]);
 
-  const pinsFromResults = results
+  const toChurchPublicFromNearby = (r: NearbyChurch): ChurchPublic => ({
+    church_id: r.church_id,
+    gers_id: null,
+    name: r.name,
+    latitude: r.latitude as number,
+    longitude: r.longitude as number,
+    address: r.address ?? null,
+    locality: r.locality,
+    region: r.region,
+    postal_code: null,
+    country: r.country,
+    website: r.website,
+    website_root: null,
+    pipeline_status: null,
+    search_blob: null,
+    belief_type: r.belief_type ?? null,
+    trinitarian_beliefs: null,
+    church_beliefs_url: null,
+    services_info: null,
+    service_languages: Array.isArray(r.service_languages) ? r.service_languages : null,
+    instagram_url: null,
+    youtube_url: null,
+    social_media: null,
+    scraped_email: null,
+    phone: null,
+    church_phone: null,
+    giving_url: null,
+    scraped_address: null,
+    programs_offered: null,
+    church_summary: null,
+    geo: null,
+    geojson: (typeof r.longitude === 'number' && typeof r.latitude === 'number')
+      ? { type: 'Point', coordinates: [r.longitude as number, r.latitude as number] }
+      : null,
+  });
+
+  const pinsFromResults: ChurchPublic[] = results
     .filter((r) => typeof r.latitude === 'number' && typeof r.longitude === 'number')
-    .map((r) => ({
-      church_id: r.church_id,
-      name: r.name,
-      latitude: r.latitude as number,
-      longitude: r.longitude as number,
-      locality: r.locality,
-      region: r.region,
-      country: r.country,
-      website: r.website,
-      belief_type: r.belief_type ?? null,
-      service_languages: Array.isArray(r.service_languages) ? r.service_languages : null,
-      geojson: null,
-    }));
+    .map(toChurchPublicFromNearby);
 
   if (!initialPinsLoaded && pinsFromResults.length === 0 && initialPins.length > 0) {
     setInitialPinsLoaded(true);
