@@ -31,7 +31,6 @@ export default function MobileSearch({ context = 'home', initialQuery = '' }: Mo
   const router = useRouter()
   const sp = useSearchParams()
 
-  // Sync selected beliefs from URL
   useEffect(() => {
     const raw = sp.get('belief') || ''
     const next = new Set<BeliefValue>()
@@ -53,11 +52,7 @@ export default function MobileSearch({ context = 'home', initialQuery = '' }: Mo
     if (selectedBeliefs.size) params.set('belief', Array.from(selectedBeliefs).join(','))
     const language = sp.get('language')
     if (language) params.set('language', language)
-    if (context === 'search') {
-      router.push(`/search?${params.toString()}`)
-    } else {
-      router.push(`/${params.toString() ? `?${params.toString()}` : ''}`)
-    }
+    router.push(`/explorer${params.toString() ? `?${params.toString()}` : ''}`)
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -78,37 +73,21 @@ export default function MobileSearch({ context = 'home', initialQuery = '' }: Mo
   function applyFilters() {
     const csv = Array.from(selectedBeliefs).join(',')
     const language = sp.get('language')
-    if (context === 'search') {
-      const qParam = (sp.get('q') || searchQuery.trim())
-      const params = new URLSearchParams()
-      if (qParam) params.set('q', qParam)
-      if (csv) params.set('belief', csv)
-      if (language) params.set('language', language)
-      router.push(`/search${params.toString() ? `?${params.toString()}` : ''}`)
-    } else {
-      const params = new URLSearchParams()
-      if (csv) params.set('belief', csv)
-      if (language) params.set('language', language)
-      router.push(`/${params.toString() ? `?${params.toString()}` : ''}`)
-    }
+    const params = new URLSearchParams()
+    if (csv) params.set('belief', csv)
+    if (language) params.set('language', language)
+    router.push(`/explorer${params.toString() ? `?${params.toString()}` : ''}`)
     setFilterOpen(false)
   }
 
   function clearFilters() {
     setSelectedBeliefs(new Set())
-    if (context === 'search') {
-      const qParam = (sp.get('q') || searchQuery.trim())
-      const params = new URLSearchParams()
-      if (qParam) params.set('q', qParam)
-      const language = sp.get('language')
-      if (language) params.set('language', language)
-      router.push(`/search${params.toString() ? `?${params.toString()}` : ''}`)
-    } else {
-      const language = sp.get('language')
-      const params = new URLSearchParams()
-      if (language) params.set('language', language)
-      router.push(`/${params.toString() ? `?${params.toString()}` : ''}`)
-    }
+    const qParam = (sp.get('q') || searchQuery.trim())
+    const params = new URLSearchParams()
+    if (qParam) params.set('q', qParam)
+    const language = sp.get('language')
+    if (language) params.set('language', language)
+    router.push(`/explorer${params.toString() ? `?${params.toString()}` : ''}`)
     setFilterOpen(false)
   }
 
@@ -178,3 +157,5 @@ export default function MobileSearch({ context = 'home', initialQuery = '' }: Mo
     </div>
   )
 }
+
+

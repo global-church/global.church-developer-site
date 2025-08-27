@@ -27,7 +27,7 @@ export default async function ChurchPage({
       <div className="min-h-screen bg-gray-50 pb-32">
         <div className="bg-white px-4 py-4 border-b border-gray-200">
           <div className="flex items-center gap-3 mb-2">
-            <Link href="/" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <Link href="/explorer" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
               <ArrowLeft size={20} />
             </Link>
             <h1 className="text-xl font-semibold text-gray-900">Church</h1>

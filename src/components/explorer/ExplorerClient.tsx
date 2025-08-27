@@ -1,19 +1,17 @@
-// src/components/NearbyResults.tsx
 "use client";
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { MapPin, ChevronRight } from "lucide-react";
 import ChurchMap from "@/components/ChurchMap";
-import MobileSearch from "@/components/MobileSearch";
+import MobileSearch from "@/components/explorer/MobileSearch";
 import BeliefFilterButton from "@/components/BeliefFilterButton";
 import LanguageFilterButton from "@/components/LanguageFilterButton";
-import { NearMeButton } from "./NearMeButton";
+import { NearMeButton } from "@/components/NearMeButton";
 import { fetchNearbyChurches, NearbyChurch } from "@/lib/nearMe";
-// All enrichment now comes from the API; no direct DB calls
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function NearbyResults({ initialPins = [] as Array<{ church_id: string; name: string; latitude: number; longitude: number; locality: string | null; region: string | null; country: string; website: string | null; belief_type?: string | null; service_languages?: string[] | null; geojson?: { type: 'Point'; coordinates: [number, number] } | null }>} : { initialPins?: Array<{ church_id: string; name: string; latitude: number; longitude: number; locality: string | null; region: string | null; country: string; website: string | null; belief_type?: string | null; service_languages?: string[] | null; geojson?: { type: 'Point'; coordinates: [number, number] } | null }> }) {
+export default function ExplorerClient({ initialPins = [] as Array<{ church_id: string; name: string; latitude: number; longitude: number; locality: string | null; region: string | null; country: string; website: string | null; belief_type?: string | null; service_languages?: string[] | null; geojson?: { type: 'Point'; coordinates: [number, number] } | null }>} : { initialPins?: Array<{ church_id: string; name: string; latitude: number; longitude: number; locality: string | null; region: string | null; country: string; website: string | null; belief_type?: string | null; service_languages?: string[] | null; geojson?: { type: 'Point'; coordinates: [number, number] } | null }> }) {
   const [results, setResults] = useState<NearbyChurch[]>([]);
-  const [baseResults, setBaseResults] = useState<NearbyChurch[]>([]); // unfiltered, enriched
+  const [baseResults, setBaseResults] = useState<NearbyChurch[]>([]);
   const [loading, setLoading] = useState(false);
   const [radiusKm, setRadiusKm] = useState(25);
   const [unit, setUnit] = useState<"km" | "mi">("km");
@@ -31,7 +29,6 @@ export default function NearbyResults({ initialPins = [] as Array<{ church_id: s
         setBaseResults(data as unknown as NearbyChurch[]);
       } catch (e: unknown) {
         const msg = (e instanceof Error && e.message) ? e.message : String(e);
-        // Provide detailed diagnostics for debugging
         console.error("NearMe error:", e);
         const details = [
           `coords=(${lat.toFixed?.(5) ?? lat}, ${lng.toFixed?.(5) ?? lng})`,
@@ -51,15 +48,11 @@ export default function NearbyResults({ initialPins = [] as Array<{ church_id: s
     return `${miles.toFixed(1)} mi`;
   };
 
-  // Prefer the RPC's service_languages (string[]) but retain a light fallback to services_info if present.
   const extractLanguages = (church: NearbyChurch & { services_info?: string | null }): string[] => {
     const langsFromRpc: string[] = Array.isArray(church.service_languages)
       ? church.service_languages.map((s) => String(s).trim()).filter(Boolean)
       : [];
-
     if (langsFromRpc.length > 0) return langsFromRpc;
-
-    // Fallback for older data shape where services_info may exist and contain "English: ..." etc.
     if (typeof church.services_info === "string" && church.services_info.length > 0) {
       try {
         const parsed = JSON.parse(church.services_info);
@@ -69,30 +62,26 @@ export default function NearbyResults({ initialPins = [] as Array<{ church_id: s
           ? [parsed]
           : [];
         const set = new Set<string>();
-        const re = /^\s*([^:]+):\s*/; // grab everything before first colon
+        const re = /^\s*([^:]+):\s*/;
         for (const item of items) {
           const m = String(item).match(re);
           if (m && m[1]) set.add(m[1].trim());
         }
         return Array.from(set);
       } catch {
-        // ignore parsing errors
       }
     }
-
     return [];
   };
 
   const formatBelief = (belief?: NearbyChurch['belief_type'] | null) => {
     if (!belief) return null;
-    // Pretty-print values like "roman_catholic" -> "Roman Catholic"
     return belief
       .split("_")
       .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
       .join(" ");
   };
 
-  // Compute filters from URL params
   const spKey = sp.toString();
   const resultsKey = useMemo(() => {
     const n = baseResults.length
@@ -102,7 +91,6 @@ export default function NearbyResults({ initialPins = [] as Array<{ church_id: s
     return `${n}:${first}:${last}`
   }, [baseResults])
 
-  // Apply filters whenever base results or filters change
   useEffect(() => {
     if (!baseResults.length) {
       setResults([]);
@@ -121,12 +109,10 @@ export default function NearbyResults({ initialPins = [] as Array<{ church_id: s
     setResults(filtered);
   }, [baseResults, sp]);
 
-  // Increment fitKey when filters/search results change, to trigger a one-time map fit
   useEffect(() => {
     setFitKey((k) => k + 1);
   }, [spKey, resultsKey]);
 
-  // On initial mount/refresh: clear filter params so a hard reload resets filters
   const didResetOnLoadRef = useRef(false);
   useEffect(() => {
     if (didResetOnLoadRef.current) return;
@@ -137,11 +123,10 @@ export default function NearbyResults({ initialPins = [] as Array<{ church_id: s
       params.delete('belief');
       params.delete('language');
       const qs = params.toString();
-      router.replace(qs ? `/?${qs}` : '/');
+      router.replace(qs ? `/explorer?${qs}` : '/explorer');
     }
   }, [router, sp]);
 
-  // Build pins for the map mirroring current results
   const pinsFromResults = results
     .filter((r) => typeof r.latitude === 'number' && typeof r.longitude === 'number')
     .map((r) => ({
@@ -158,19 +143,10 @@ export default function NearbyResults({ initialPins = [] as Array<{ church_id: s
       geojson: null,
     }));
 
-  // Load an initial sample of pins to populate the map on first render
-  // if there are no nearby results yet
-  // We reuse the bbox loading already in the map component, but seed with a light sample here
-  // so users immediately see pins.
-  // This uses a lightweight RPC via the map viewport later; here we just mark as loaded so the
-  // map creates clusters and then will fetch via viewport.
   if (!initialPinsLoaded && pinsFromResults.length === 0 && initialPins.length > 0) {
-    // Render an empty list; map component will fetch by viewport via its effect.
-    // Mark as loaded to avoid looping.
     setInitialPinsLoaded(true);
   }
 
-  // Filter initial pins by current URL filters when there are no nearby results yet
   const filteredInitialPins = useMemo(() => {
     if (pinsFromResults.length > 0) return []
     const beliefParam = sp.get('belief') || ''
@@ -189,11 +165,7 @@ export default function NearbyResults({ initialPins = [] as Array<{ church_id: s
 
   return (
     <section className="space-y-6">
-      {/* A: Heading */}
-      <h2 className="text-2xl font-semibold text-center">Find churches near you</h2>
-      {/* B: Subtext */}
-      <p className="text-sm text-gray-600 text-center">We’ll use your device’s location (with your permission) to show nearby churches.</p>
-      {/* C: Filters row */}
+      {/* Filters row */}
       <div className="flex items-center justify-center gap-3 flex-wrap">
         <BeliefFilterButton />
         <LanguageFilterButton />
@@ -222,22 +194,19 @@ export default function NearbyResults({ initialPins = [] as Array<{ church_id: s
         </label>
       </div>
 
-      {/* D: Near me button */}
+      {/* Near me button */}
       <div className="flex items-center justify-center">
         <NearMeButton onLocated={onLocated} label="Search From My Location" />
       </div>
 
-      {/* E: or */}
-      <div className="text-center text-sm text-gray-500">or</div>
-
-      {/* F: Keyword search bar */}
+      {/* Keyword search bar */}
       <div className="flex justify-center">
         <div className="w-full max-w-3xl">
           <MobileSearch context="home" />
         </div>
       </div>
 
-      {/* G: Results list */}
+      {/* Results list */}
       {loading && (
         <div className="text-sm text-gray-600 text-center">Loading nearby churches…</div>
       )}
@@ -256,7 +225,6 @@ export default function NearbyResults({ initialPins = [] as Array<{ church_id: s
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="font-medium truncate">{r.name}</div>
-                      {/* Badges row */}
                       <div className="flex items-center gap-1 flex-shrink-0 overflow-hidden">
                         {beliefPretty && (
                           <span className="inline-flex items-center rounded-md bg-gray-100 text-gray-700 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
@@ -308,10 +276,12 @@ export default function NearbyResults({ initialPins = [] as Array<{ church_id: s
         </p>
       )}
 
-      {/* H: Map mirrors current filters/search results */}
+      {/* Map mirrors current filters/search results */}
       <div className="h-[420px] w-full rounded-xl overflow-hidden border">
         <ChurchMap pins={pinsFromResults.length > 0 ? pinsFromResults : filteredInitialPins} fitKey={fitKey} />
       </div>
     </section>
   );
 }
+
+
