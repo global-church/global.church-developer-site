@@ -120,7 +120,7 @@ curl -s -X POST "${MCP_URL}" \\
             <ul>
               <li>Always call <code>churches_search_v1</code></li>
               <li>Use <code>arguments.queryParams</code></li>
-              <li>Respect enum values (e.g., <code>belief="roman_catholic"</code>)</li>
+              <li>Respect enum values (e.g., <code>belief=&quot;roman_catholic&quot;</code>)</li>
             </ul>
           </li>
         </ol>
