@@ -8,7 +8,7 @@ import LanguageFilterButton from "@/components/LanguageFilterButton";
 import { NearMeButton } from "@/components/NearMeButton";
 import { fetchNearbyChurches, NearbyChurch } from "@/lib/nearMe";
 import type { ChurchPublic } from "@/lib/types";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import ServiceDayFilter from "@/components/explorer/filters/ServiceDayFilter";
 import ServiceTimeFilter from "./filters/ServiceTimeFilter";
@@ -29,7 +29,6 @@ export default function ExplorerClient() {
   const [radiusKm, setRadiusKm] = useState(25);
   const [unit, setUnit] = useState<"km" | "mi">("km");
   const sp = useSearchParams();
-  const router = useRouter();
   const [fitKey, setFitKey] = useState(0);
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number; accuracy: number; isHighAccuracy: boolean } | null>(null);

@@ -101,7 +101,10 @@ export type ChurchPublic = {
   service_times?: number[] | null;
   service_source_urls?: string[] | null;
   ministry_names?: string[] | null;
-  ministries_json?: any; // or a more specific type if you have one
+  ministries_json?:
+    | Array<{ name?: string | null; notes?: string | null; source_url?: string | null; source_text?: string | null }>
+    | { [key: string]: unknown }
+    | null;
   denomination?: string | null;
   trinitarian?: boolean | null;
   extraction_confidence?: number | null;

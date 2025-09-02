@@ -462,7 +462,9 @@ export default function LeafletMapInner({
       if (hasPannedRef.current) return
       try {
         map.panTo([loc.lat, loc.lng], { animate: true })
-      } catch {}
+      } catch {
+        // ignore
+      }
       hasPannedRef.current = true
     }, [loc, map])
 
