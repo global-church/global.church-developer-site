@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, ZoomControl, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, ZoomControl, useMap, Circle } from 'react-leaflet'
 import Supercluster from 'supercluster'
 import type { DivIcon, LatLngBoundsExpression } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -27,6 +27,7 @@ export default function LeafletMapInner({
 	zoom = 3,
 	fitKey,
 	disableViewportFetch = false,
+  userLocation,
 }: {
 	pins: {
 		church_id: string
@@ -45,6 +46,7 @@ export default function LeafletMapInner({
 	zoom?: number
 	fitKey?: number
 	disableViewportFetch?: boolean
+  userLocation?: { lat: number; lng: number; accuracy: number; isHighAccuracy: boolean } | null
 }) {
 	const [blackPinIcon, setBlackPinIcon] = useState<DivIcon | null>(null)
   const [clusterIndex, setClusterIndex] = useState<Supercluster | null>(null)
@@ -425,6 +427,61 @@ export default function LeafletMapInner({
     return null
   }
 
+  function UserLocationLayer({ loc }: { loc: { lat: number; lng: number; accuracy: number; isHighAccuracy: boolean } }) {
+    const map = useMap()
+    const [blueIcon, setBlueIcon] = useState<DivIcon | null>(null)
+    const hasPannedRef = useRef(false)
+
+    useEffect(() => {
+      let cancelled = false
+      const create = async () => {
+        try {
+          const L = await import('leaflet')
+          if (cancelled) return
+          const size = 14
+          const border = 2
+          const html = `
+            <div style="
+              width: ${size}px; height: ${size}px; border-radius: 50%;
+              background: #0A84FF; border: ${border}px solid #fff;
+              box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            "></div>
+          `
+          const icon = L.divIcon({ className: '', html, iconSize: [size, size], iconAnchor: [Math.round(size/2), Math.round(size/2)] })
+          setBlueIcon(icon)
+        } catch (e) {
+          // no-op
+        }
+      }
+      create()
+      return () => { cancelled = true }
+    }, [])
+
+    useEffect(() => {
+      if (!loc) return
+      if (hasPannedRef.current) return
+      try {
+        map.panTo([loc.lat, loc.lng], { animate: true })
+      } catch {}
+      hasPannedRef.current = true
+    }, [loc, map])
+
+    if (!loc) return null
+
+    if (loc.isHighAccuracy) {
+      if (!blueIcon) return null
+      return <Marker position={[loc.lat, loc.lng]} icon={blueIcon} />
+    }
+    const radius = Math.max(0, Number(loc.accuracy))
+    return (
+      <Circle
+        center={[loc.lat, loc.lng]}
+        radius={radius}
+        pathOptions={{ color: '#0A84FF', fillColor: '#0A84FF', fillOpacity: 0.15, opacity: 0.4, weight: 2 }}
+      />
+    )
+  }
+
 	// Shared map props to prevent infinite zoom-out and vertical gray space
 	const mapProps = {
 		center,
@@ -462,6 +519,9 @@ export default function LeafletMapInner({
 				<ZoomControl position="topright" />
 				<MapStateSyncCore onChange={handleMapChange} padding={0.75} />
 				<FitToPins pinsToFit={pins} triggerKey={fitKey} />
+				{userLocation && (
+					<UserLocationLayer loc={userLocation} />
+				)}
 				{clusterIndex && bounds && (
 					<>
 						{clusterIndex.getClusters([bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1]], Math.round(zoomLevel)).map((c) => {

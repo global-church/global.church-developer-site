@@ -10,7 +10,7 @@ const navLinks = [
   { href: "/explorer", label: "Church Explorer" },
   { href: "/schema", label: "Schema" },
   { href: "/api-docs", label: "API" },
-  { href: "/mcp-server", label: "MCP Server" },
+  { href: "/mcp-server", label: "MCP" },
   { href: "/about", label: "About" },
   { href: "/faq", label: "FAQs" },
   { href: "/contact", label: "Contact" },

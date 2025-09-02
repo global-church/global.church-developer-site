@@ -23,8 +23,8 @@ export default function Page() {
             We&#39;re building an open-source data schema and a powerful API to help developers connect people with local churches worldwide.
           </p>
           <div className="mt-8 flex justify-center gap-4">
-            <Link href="/api-docs" passHref>
-              <Button size="lg">Explore the API</Button>
+            <Link href="/explorer" passHref>
+              <Button size="lg">Explore Churches</Button>
             </Link>
             <Link href="/schema" passHref>
               <Button variant="outline" size="lg">View the Schema</Button>
@@ -43,7 +43,7 @@ export default function Page() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <FeatureCard
               icon={<FileText size={24} />}
-              title="A Shared Schema"
+              title="Shared Schema"
               description="A standardized, open-source data model for church information, designed for interoperability."
               href="/schema"
             />

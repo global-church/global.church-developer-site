@@ -3,12 +3,14 @@
 import { useEffect } from "react";
 import { useGeolocation } from "@/hooks/useGeolocation";
 
-export function NearMeButton({ onLocated, label }: { onLocated: (coords: {lat:number; lng:number}) => void; label?: string }) {
-  const { coords, loading, error, request } = useGeolocation();
+export function NearMeButton({ onLocated, label }: { onLocated: (coords: {lat:number; lng:number; accuracy: number; isHighAccuracy: boolean}) => void; label?: string }) {
+  const { coords, accuracy, isHighAccuracy, loading, error, request } = useGeolocation();
 
   useEffect(() => {
-    if (coords) onLocated(coords);
-  }, [coords, onLocated]);
+    if (coords && typeof accuracy === 'number' && typeof isHighAccuracy === 'boolean') {
+      onLocated({ lat: coords.lat, lng: coords.lng, accuracy, isHighAccuracy });
+    }
+  }, [coords, accuracy, isHighAccuracy, onLocated]);
 
   return (
     <div className="flex items-center gap-2">

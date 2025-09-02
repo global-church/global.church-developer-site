@@ -103,6 +103,7 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
   const router = useRouter();
   const [fitKey, setFitKey] = useState(0);
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number; accuracy: number; isHighAccuracy: boolean } | null>(null);
 
   // Advanced filter state
   const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
@@ -110,7 +111,8 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
   const [programQuery, setProgramQuery] = useState<string>("");
 
   const onLocated = useCallback(
-    async ({ lat, lng }: { lat: number; lng: number }) => {
+    async ({ lat, lng, accuracy, isHighAccuracy }: { lat: number; lng: number; accuracy: number; isHighAccuracy: boolean }) => {
+      setUserLocation({ lat, lng, accuracy, isHighAccuracy });
       setLoading(true);
       try {
         const radiusForRpcKm = unit === "km" ? radiusKm : radiusKm * 1.60934;
@@ -394,7 +396,7 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
 
       {/* Map mirrors current filters/search results – always shown below the button */}
       <div className="h-[420px] w-full rounded-xl overflow-hidden border">
-        <ChurchMap pins={mapPins} fitKey={fitKey} disableViewportFetch={true} />
+        <ChurchMap pins={mapPins} fitKey={fitKey} disableViewportFetch={true} userLocation={userLocation} />
       </div>
 
       {/* Removed keyword search bar in favor of advanced filters */}
