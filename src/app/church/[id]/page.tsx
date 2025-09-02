@@ -43,9 +43,14 @@ export default async function ChurchPage({
     ? church.service_languages
     : (church.service_languages ? String(church.service_languages).split(',').map(s => s.trim()).filter(Boolean) : [])
 
-  // Best phone selection
-  const preferredPhone = church.church_phone?.trim() || church.phone?.trim() || null
+  // Contact info (prefer structured arrays when available)
+  const preferredPhone = (Array.isArray(church.contact_phones) && church.contact_phones.length > 0
+    ? String(church.contact_phones[0])
+    : (church.church_phone?.trim() || church.phone?.trim() || null))
   const telHref = preferredPhone ? `tel:${preferredPhone.replace(/[^\d+]/g, '')}` : null
+  const contactEmails = Array.isArray(church.contact_emails)
+    ? church.contact_emails.map((e) => String(e).trim()).filter(Boolean)
+    : (church.scraped_email ? [church.scraped_email] : [])
 
   // Build full address (omit null/"NULL") and directions link
   const isValidPart = (p?: string | null) => !!p && String(p).trim().length > 0 && String(p).toLowerCase() !== 'null'
@@ -93,7 +98,7 @@ export default async function ChurchPage({
     : null
 
   // Extract Facebook Page URL server-side to keep client lean
-  const fbUrl = getFacebookPageUrl(church.social_media)
+  const fbUrl = getFacebookPageUrl(church.social_media) || church.url_facebook || null
 
   // Parse services_info JSON string into structured lines (robust regex)
   const serviceLines = (() => {
@@ -152,15 +157,59 @@ export default async function ChurchPage({
         .filter((program) => program.length > 0)
     : []
 
+  // Ministries: prefer structured objects from ministries_json (name + source_url).
+  // Fallback to ministry_names as plain labels when no URLs are available.
+  const ministries: { name: string; url?: string | null }[] = (() => {
+    const list: { name: string; url?: string | null }[] = []
+    const src = church.ministries_json
+    const pushFromAny = (v: unknown) => {
+      if (!v) return
+      if (typeof v === 'string') {
+        const name = v.trim()
+        if (name) list.push({ name })
+        return
+      }
+      if (typeof v === 'object') {
+        const obj = v as { name?: unknown; source_url?: unknown }
+        const name = typeof obj.name === 'string' ? obj.name.trim() : ''
+        const url = typeof obj.source_url === 'string' ? obj.source_url : undefined
+        if (name) list.push({ name, url })
+      }
+    }
+    if (Array.isArray(src)) {
+      src.forEach(pushFromAny)
+    } else if (src && typeof src === 'object') {
+      for (const val of Object.values(src as Record<string, unknown>)) {
+        if (Array.isArray(val)) val.forEach(pushFromAny)
+        else pushFromAny(val)
+      }
+    }
+    if (list.length === 0 && Array.isArray(church.ministry_names)) {
+      church.ministry_names.forEach((n) => {
+        const name = String(n).trim()
+        if (name) list.push({ name })
+      })
+    }
+    return list
+  })()
+
+  // Prefer new url_* fields for links, fallback to legacy when absent
+  const givingHref = (() => {
+    const raw = church.url_giving || church.giving_url || null
+    if (!raw) return null
+    return raw.startsWith('http') ? raw : `https://${raw}`
+  })()
+  const beliefsHref = church.url_beliefs || church.church_beliefs_url || null
+
   // Determine if Connect has at least one actionable button
   const hasConnect: boolean = Boolean(
-    church.instagram_url ||
+    church.url_instagram || church.instagram_url ||
     fbUrl ||
     hasValidYouTube ||
-    church.scraped_email ||
+    contactEmails.length > 0 ||
     (preferredPhone && telHref) ||
-    church.giving_url ||
-    church.church_beliefs_url
+    givingHref ||
+    beliefsHref
   )
 
   return (
@@ -266,13 +315,43 @@ export default async function ChurchPage({
           </div>
         )}
 
+        {ministries.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 className="text-sm font-medium text-gray-700 mb-3 text-center">Ministries</h3>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {ministries.map((m: { name: string; url?: string | null }, idx: number) => {
+                const href = m.url && m.url.startsWith('http') ? m.url : (m.url ? `https://${m.url}` : null)
+                return href ? (
+                  <a
+                    key={`${m.name}-${idx}`}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-full bg-gray-100 text-gray-700 px-3 py-1 text-xs font-medium hover:bg-gray-200"
+                  >
+                    {m.name}
+                    <ExternalLink size={12} className="ml-1" />
+                  </a>
+                ) : (
+                  <span
+                    key={`${m.name}-${idx}`}
+                    className="inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-3 py-1 text-xs font-medium"
+                  >
+                    {m.name}
+                  </span>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {hasConnect && (
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <h3 className="text-sm font-medium text-gray-700 mb-3 text-center">Connect</h3>
             <div className="flex items-center justify-center flex-wrap gap-3">
-              {church.instagram_url && (
+              {(church.url_instagram || church.instagram_url) && (
                 <a
-                  href={church.instagram_url}
+                  href={(church.url_instagram || church.instagram_url) as string}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Instagram"
@@ -303,9 +382,9 @@ export default async function ChurchPage({
                   <Youtube size={18} />
                 </a>
               )}
-              {church.scraped_email && (
+              {contactEmails[0] && (
                 <a
-                  href={`mailto:${church.scraped_email}`}
+                  href={`mailto:${contactEmails[0]}`}
                   aria-label="Email"
                   className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
                 >
@@ -321,9 +400,9 @@ export default async function ChurchPage({
                   <Phone size={18} />
                 </a>
               )}
-              {church.giving_url && (
+              {givingHref && (
                 <a
-                  href={church.giving_url.startsWith('http') ? church.giving_url : `https://${church.giving_url}`}
+                  href={givingHref}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors text-sm font-medium"
@@ -332,9 +411,9 @@ export default async function ChurchPage({
                   <ExternalLink size={14} />
                 </a>
               )}
-              {church.church_beliefs_url && (
+              {beliefsHref && (
                 <a
-                  href={church.church_beliefs_url}
+                  href={beliefsHref}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors text-sm font-medium"
@@ -346,6 +425,8 @@ export default async function ChurchPage({
             </div>
           </div>
         )}
+
+        {/* Contact Emails section removed per requirements */}
 
         {/* YouTube section renders itself (includes wrapper + heading) and hides on 404/invalid */}
         {church.youtube_url && (

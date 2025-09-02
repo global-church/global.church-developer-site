@@ -32,49 +32,9 @@ export async function fetchNearbyChurches(
     limit: maxResults,
   });
 
-  // Resilient number parsing
-  const asNumber = (v: unknown): number | null => {
-    if (typeof v === 'number') return Number.isFinite(v) ? v : null;
-    if (typeof v === 'string') {
-      const n = parseFloat(v);
-      return Number.isFinite(n) ? n : null;
-    }
-    return null;
-  };
-
-  // Be resilient to different distance fields from API (distance_km, distance_m, distance). Fallback to haversine.
-  type RowWithDistance = Partial<ChurchWithinRadiusRow> & { distance?: number | string };
-  const toKm = (row: RowWithDistance): number | null => {
-    const km = asNumber((row as { distance_km?: unknown }).distance_km);
-    if (km !== null) return km;
-    const m = asNumber((row as { distance_m?: unknown }).distance_m);
-    if (m !== null) return m / 1000;
-    const d = asNumber((row as { distance?: unknown }).distance);
-    if (d !== null) return d; // assume already in km
-    return null;
-  };
-
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const haversineKm = (la1: number, lo1: number, la2: number, lo2: number) => {
-    const R = 6371; // km
-    const dLat = toRad(la2 - la1);
-    const dLon = toRad(lo2 - lo1);
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(toRad(la1)) * Math.cos(toRad(la2)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
-
-  const rows = results as Array<RowWithDistance>;
-  return rows.map((church) => {
-    const apiKm = toKm(church as RowWithDistance);
-    const lat2 = asNumber((church as { latitude?: unknown }).latitude);
-    const lng2 = asNumber((church as { longitude?: unknown }).longitude);
-    const fallbackKm = lat2 !== null && lng2 !== null ? haversineKm(lat, lng, lat2, lng2) : 0;
-    return {
-      ...church,
-      distance_km: apiKm !== null && apiKm > 0 ? apiKm : fallbackKm,
-    } as NearbyChurch;
-  });
+  const rows = results as Array<ChurchWithinRadiusRow>;
+  return rows.map((church) => ({
+    ...church,
+    distance_km: typeof church.distance_m === 'number' ? church.distance_m / 1000 : 0,
+  })) as unknown as NearbyChurch[];
 }

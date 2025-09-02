@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Filter } from 'lucide-react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 const DAYS: readonly string[] = [
   'Sunday',
@@ -14,10 +15,21 @@ const DAYS: readonly string[] = [
   'Saturday',
 ] as const
 
-export default function ServiceDayFilter({ onSelectionChange }: { onSelectionChange: (days: Set<string>) => void }) {
+export default function ServiceDayFilter() {
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const router = useRouter()
+  const pathname = usePathname()
+  const sp = useSearchParams()
+
+  // Sync from URL
+  useEffect(() => {
+    const raw = sp.get('service_days') || ''
+    const next = new Set<string>()
+    raw.split(',').map((s) => s.trim()).filter(Boolean).forEach((d) => next.add(d))
+    setSelected(next)
+  }, [sp])
 
   const toggle = (day: string) => {
     setSelected((prev) => {
@@ -29,13 +41,21 @@ export default function ServiceDayFilter({ onSelectionChange }: { onSelectionCha
   }
 
   const apply = useCallback(() => {
-    onSelectionChange(new Set(selected))
+    const params = new URLSearchParams(sp.toString())
+    const csv = Array.from(selected).join(',')
+    if (csv) params.set('service_days', csv)
+    else params.delete('service_days')
+    const qs = params.toString()
+    router.push(qs ? `${pathname}?${qs}` : pathname)
     setOpen(false)
-  }, [onSelectionChange, selected])
+  }, [pathname, router, selected, sp])
 
   const clear = () => {
     setSelected(new Set())
-    onSelectionChange(new Set())
+    const params = new URLSearchParams(sp.toString())
+    params.delete('service_days')
+    const qs = params.toString()
+    router.push(qs ? `${pathname}?${qs}` : pathname)
     setOpen(false)
   }
 

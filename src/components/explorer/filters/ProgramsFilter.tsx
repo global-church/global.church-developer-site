@@ -3,11 +3,22 @@
 import { useEffect, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Search } from 'lucide-react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
-export default function ProgramsFilter({ onQueryChange }: { onQueryChange: (q: string) => void }) {
+export default function ProgramsFilter() {
   const [value, setValue] = useState('')
   const [debounced, setDebounced] = useState('')
   const ref = useRef<HTMLInputElement | null>(null)
+  const router = useRouter()
+  const pathname = usePathname()
+  const sp = useSearchParams()
+
+  // sync from URL on mount/changes
+  useEffect(() => {
+    const current = sp.get('programs') || ''
+    setValue(current)
+    setDebounced(current)
+  }, [sp])
 
   // debounce
   useEffect(() => {
@@ -15,9 +26,15 @@ export default function ProgramsFilter({ onQueryChange }: { onQueryChange: (q: s
     return () => clearTimeout(id)
   }, [value])
 
+  // push to URL as programs
   useEffect(() => {
-    onQueryChange(debounced)
-  }, [debounced, onQueryChange])
+    const params = new URLSearchParams(sp.toString())
+    const v = debounced.trim()
+    if (v) params.set('programs', v)
+    else params.delete('programs')
+    const qs = params.toString()
+    router.push(qs ? `${pathname}?${qs}` : pathname)
+  }, [debounced, pathname, router, sp])
 
   return (
     <div className="relative w-64">
@@ -30,6 +47,7 @@ export default function ProgramsFilter({ onQueryChange }: { onQueryChange: (q: s
         placeholder="e.g., 'Awana', 'Youth Group'"
         value={value}
         onChange={(e) => setValue(e.target.value)}
+        aria-label="Filter by program name"
       />
     </div>
   )

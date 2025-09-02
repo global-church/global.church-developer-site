@@ -37,8 +37,8 @@ export type ChurchPublic = {
   name: string;
 
   // location
-  latitude: number | null; // double precision
-  longitude: number | null; // double precision
+  latitude: number | null;
+  longitude: number | null;
   address: string | null;
   locality: string | null;
   region: string | null;
@@ -50,28 +50,21 @@ export type ChurchPublic = {
   website_root: string | null;
 
   // internal/search-ish
-  pipeline_status: PipelineStatus | null; // stored as text in DB
+  pipeline_status: PipelineStatus | null;
   search_blob: string | null;
 
   // beliefs / classification
-  belief_type: BeliefType | null; // enum in app, enum type in DB
+  belief_type: BeliefType | null;
   trinitarian_beliefs: boolean | null;
   church_beliefs_url: string | null;
 
   // services info
   services_info: string | null;
-
-  /** Postgres text[] → Supabase returns string[] */
   service_languages: string[] | null;
 
   // socials
   instagram_url: string | null;
   youtube_url: string | null;
-
-  /**
-   * Generic social media accounts (Facebook, etc.)
-   * Postgres text[] → Supabase returns string[]
-   */
   social_media: string[] | null;
 
   // contact
@@ -92,11 +85,30 @@ export type ChurchPublic = {
   church_summary: string | null;
 
   // spatial (from view)
-  /** Raw PostGIS geography WKB (you can ignore this in FE) */
   geo: string | null;
-
-  /** Handy for maps: { type: 'Point', coordinates: [lng, lat] } */
   geojson: GeoJSONPoint | null;
+
+  // new fields from V1 schema
+  url_giving?: string | null;
+  url_beliefs?: string | null;
+  url_facebook?: string | null;
+  url_instagram?: string | null;
+  url_tiktok?: string | null;
+  url_campus?: string | null;
+  url_live?: string | null;
+  contact_emails?: string[] | null;
+  contact_phones?: string[] | null;
+  service_times?: number[] | null;
+  service_source_urls?: string[] | null;
+  ministry_names?: string[] | null;
+  ministries_json?: any; // or a more specific type if you have one
+  denomination?: string | null;
+  trinitarian?: boolean | null;
+  extraction_confidence?: number | null;
+  is_weekly_church?: boolean | null;
+  campus_name?: string | null;
+  overarching_name?: string | null;
+  is_multi_campus?: boolean | null;
 };
 
 /**

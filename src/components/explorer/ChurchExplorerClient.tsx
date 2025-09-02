@@ -13,88 +13,17 @@ import { Button } from "@/components/ui/button";
 import ServiceDayFilter from "@/components/explorer/filters/ServiceDayFilter";
 import ServiceTimeFilter from "./filters/ServiceTimeFilter";
 import ProgramsFilter from "./filters/ProgramsFilter";
+import { searchChurches } from "@/lib/zuplo";
 
-// Local helpers (module scope) to keep hook deps stable
-type ParsedService = { day: string; time: string; description?: string };
-const DAY_NAME_MAP: Record<string, string> = {
-  sun: "Sunday",
-  mon: "Monday",
-  tue: "Tuesday",
-  wed: "Wednesday",
-  thu: "Thursday",
-  fri: "Friday",
-  sat: "Saturday",
-};
+// Client-side parsing/filtering removed in favor of backend filtering
 
-function to24Hour(timeStr: string): string | null {
-  const re = /^(\d{1,2}):(\d{2})\s*(am|pm)?$/i;
-  const m = timeStr.trim().match(re);
-  if (!m) return null;
-  let hours = parseInt(m[1] || "0", 10);
-  const minutes = parseInt(m[2] || "0", 10);
-  const ampm = (m[3] || "").toLowerCase();
-  if (ampm === "pm" && hours < 12) hours += 12;
-  if (ampm === "am" && hours === 12) hours = 0;
-  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
-  const hh = String(hours).padStart(2, "0");
-  const mm = String(minutes).padStart(2, "0");
-  return `${hh}:${mm}`;
-}
-
-function parseServicesInfoStable(church: { services_info?: string | null }): ParsedService[] {
-  const raw = church?.services_info ?? null;
-  if (!raw) return [];
-  let items: string[] = [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) items = parsed.map((v) => String(v));
-    else if (typeof parsed === "string") items = [parsed];
-    else items = [];
-  } catch {
-    if (typeof raw === "string" && raw.length > 0) items = [raw];
-  }
-  const re = /(Sun|Mon|Tue|Wed|Thu|Fri|Sat)\b[^\d]*(\d{1,2}:\d{2})(?:\s*(AM|PM))?/i;
-  const parsed: ParsedService[] = [];
-  for (const item of items) {
-    const m = String(item).match(re);
-    if (!m) continue;
-    const dayAbbrev = (m[1] || "").slice(0, 3).toLowerCase();
-    const timeRaw = `${m[2]}${m[3] ? ` ${m[3]}` : ""}`.trim();
-    const time24 = to24Hour(timeRaw);
-    const day = DAY_NAME_MAP[dayAbbrev] || "";
-    if (!day || !time24) continue;
-    parsed.push({ day, time: time24, description: String(item) });
-  }
-  return parsed;
-}
-
-export default function ExplorerClient({ initialPins = [] as Array<{ church_id: string; name: string; latitude: number; longitude: number; locality: string | null; region: string | null; country: string; website: string | null; belief_type?: string | null; service_languages?: string[] | null; geojson?: { type: 'Point'; coordinates: [number, number] } | null }>} : { initialPins?: Array<{ church_id: string; name: string; latitude: number; longitude: number; locality: string | null; region: string | null; country: string; website: string | null; belief_type?: string | null; service_languages?: string[] | null; geojson?: { type: 'Point'; coordinates: [number, number] } | null }> }) {
-  const initialNearbyChurches = useMemo(() => {
-    const allowed = new Set(['orthodox','roman_catholic','protestant','anglican','other','unknown']);
-    return initialPins.map((p) => ({
-      church_id: p.church_id,
-      name: p.name,
-      distance_km: 0,
-      latitude: p.latitude ?? null,
-      longitude: p.longitude ?? null,
-      address: null,
-      locality: p.locality ?? null,
-      region: p.region ?? null,
-      country: p.country,
-      website: p.website ?? null,
-      service_languages: Array.isArray(p.service_languages) ? p.service_languages : null,
-      belief_type: p.belief_type && allowed.has(String(p.belief_type).toLowerCase())
-        ? (String(p.belief_type).toLowerCase() as NearbyChurch['belief_type'])
-        : null,
-      services_info: null,
-      programs_offered: null,
-    })) as NearbyChurch[];
-  }, [initialPins]);
+export default function ExplorerClient() {
   const [searchMode, setSearchMode] = useState<'initial' | 'nearby'>('initial');
   const [nearbyResults, setNearbyResults] = useState<NearbyChurch[]>([]);
-  const baseResults: NearbyChurch[] = useMemo(
-    () => (searchMode === 'nearby' ? nearbyResults : initialNearbyChurches),
-    [searchMode, nearbyResults, initialNearbyChurches]
+  const [serverResults, setServerResults] = useState<ChurchPublic[]>([]);
+  const baseResults: ChurchPublic[] = useMemo(
+    () => (searchMode === 'nearby' ? [] : serverResults),
+    [searchMode, serverResults]
   );
   const [loading, setLoading] = useState(false);
   const [radiusKm, setRadiusKm] = useState(25);
@@ -105,10 +34,41 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number; accuracy: number; isHighAccuracy: boolean } | null>(null);
 
-  // Advanced filter state
-  const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
-  const [timeRange, setTimeRange] = useState<{ start: string | null; end: string | null }>({ start: null, end: null });
-  const [programQuery, setProgramQuery] = useState<string>("");
+  // Fetch from backend when URL params change
+  useEffect(() => {
+    let isActive = true;
+    async function load() {
+      setLoading(true);
+      try {
+        const belief = sp.get('belief') || undefined;
+        const languageCsv = sp.get('language') || '';
+        const languages = languageCsv ? languageCsv.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+        const serviceDayCsv = sp.get('service_days') || '';
+        const service_days = serviceDayCsv ? serviceDayCsv.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+        const service_time_start = sp.get('service_time_start') || undefined;
+        const service_time_end = sp.get('service_time_end') || undefined;
+        const programsStr = sp.get('programs') || '';
+        const programs = programsStr ? [programsStr] : undefined;
+
+        const rows = await searchChurches({
+          belief,
+          languages,
+          service_days,
+          service_time_start,
+          service_time_end,
+          programs,
+          // fetch all by default
+        });
+        if (!isActive) return;
+        setServerResults(Array.isArray(rows) ? rows : []);
+        setSearchMode('initial');
+      } finally {
+        if (isActive) setLoading(false);
+      }
+    }
+    load();
+    return () => { isActive = false };
+  }, [sp]);
 
   const onLocated = useCallback(
     async ({ lat, lng, accuracy, isHighAccuracy }: { lat: number; lng: number; accuracy: number; isHighAccuracy: boolean }) => {
@@ -160,31 +120,7 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
     return `${miles.toFixed(1)} mi`;
   };
 
-  const extractLanguages = (church: NearbyChurch & { services_info?: string | null }): string[] => {
-    const langsFromRpc: string[] = Array.isArray(church.service_languages)
-      ? church.service_languages.map((s) => String(s).trim()).filter(Boolean)
-      : [];
-    if (langsFromRpc.length > 0) return langsFromRpc;
-    if (typeof church.services_info === "string" && church.services_info.length > 0) {
-      try {
-        const parsed = JSON.parse(church.services_info);
-        const items: string[] = Array.isArray(parsed)
-          ? parsed.map((v) => String(v))
-          : typeof parsed === "string"
-          ? [parsed]
-          : [];
-        const set = new Set<string>();
-        const re = /^\s*([^:]+):\s*/;
-        for (const item of items) {
-          const m = String(item).match(re);
-          if (m && m[1]) set.add(m[1].trim());
-        }
-        return Array.from(set);
-      } catch {
-      }
-    }
-    return [];
-  };
+  // Languages are now provided by API; no client parsing
 
   const formatBelief = (belief?: NearbyChurch['belief_type'] | null) => {
     if (!belief) return null;
@@ -196,73 +132,33 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
 
   const spKey = sp.toString();
   const resultsKey = useMemo(() => {
-    const n = baseResults.length
+    const list = searchMode === 'nearby' ? nearbyResults : serverResults;
+    const n = list.length
     if (n === 0) return '0'
-    const first = baseResults[0]?.church_id || ''
-    const last = baseResults[n - 1]?.church_id || ''
+    const first = list[0]?.church_id || ''
+    const last = list[n - 1]?.church_id || ''
     return `${n}:${first}:${last}`
-  }, [baseResults])
+  }, [nearbyResults, searchMode, serverResults])
 
   
 
-  const churchIdToServices = useMemo(() => {
-    const map = new Map<string, ParsedService[]>();
-    for (const r of baseResults) {
-      const arr = parseServicesInfoStable(r as { services_info?: string | null });
-      map.set(r.church_id, arr);
-    }
-    return map;
-  }, [baseResults]);
-
-  const timeWithinRange = (time: string, start: string | null, end: string | null): boolean => {
-    if (!start && !end) return true;
-    const toMinutes = (t: string) => {
-      const [hh, mm] = t.split(":").map((v) => parseInt(v, 10));
-      return hh * 60 + mm;
-    };
-    const t = toMinutes(time);
-    const s = start ? toMinutes(start) : -Infinity;
-    const e = end ? toMinutes(end) : Infinity;
-    return t >= s && t <= e;
-  };
-
   const results: NearbyChurch[] = useMemo(() => {
-    if (!baseResults.length) return [];
-    const beliefParam = sp.get('belief') || '';
-    const languageParam = sp.get('language') || '';
-    const beliefs = beliefParam.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
-    const languages = languageParam.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
-
-    const selectedDaysLower = new Set(Array.from(selectedDays).map((d) => d.toLowerCase()));
-    const programQueryLower = programQuery.trim().toLowerCase();
-
-    return baseResults
-      .filter((row) => {
-        const beliefOk = beliefs.length === 0 || (row.belief_type ? beliefs.includes(String(row.belief_type)) : false);
-        const langs = Array.isArray(row.service_languages) ? row.service_languages.map((s) => s.toLowerCase()) : [];
-        const languageOk = languages.length === 0 || languages.some((lang) => langs.includes(lang));
-        return beliefOk && languageOk;
-      })
-      .filter((row) => {
-        if (selectedDaysLower.size === 0) return true;
-        const services = churchIdToServices.get(row.church_id) || [];
-        if (services.length === 0) return false;
-        return services.some((s) => selectedDaysLower.has(s.day.toLowerCase()));
-      })
-      .filter((row) => {
-        const { start, end } = timeRange || { start: null, end: null };
-        if (!start && !end) return true;
-        const services = churchIdToServices.get(row.church_id) || [];
-        if (services.length === 0) return false;
-        return services.some((s) => timeWithinRange(s.time, start, end));
-      })
-      .filter((row) => {
-        if (!programQueryLower) return true;
-        const programs = (row as unknown as { programs_offered?: string[] | null }).programs_offered || [];
-        if (!Array.isArray(programs) || programs.length === 0) return false;
-        return programs.some((p) => String(p).toLowerCase().includes(programQueryLower));
-      });
-  }, [baseResults, sp, selectedDays, timeRange, programQuery, churchIdToServices]);
+    if (searchMode === 'nearby') return nearbyResults;
+    return baseResults.map((r) => ({
+      church_id: r.church_id,
+      name: r.name,
+      distance_km: 0,
+      latitude: r.latitude,
+      longitude: r.longitude,
+      address: r.address ?? null,
+      locality: r.locality,
+      region: r.region,
+      country: r.country,
+      website: r.website,
+      service_languages: Array.isArray(r.service_languages) ? r.service_languages : null,
+      belief_type: (r.belief_type as NearbyChurch['belief_type']) ?? null,
+    }));
+  }, [baseResults, nearbyResults, searchMode]);
 
   useEffect(() => {
     setFitKey((k) => k + 1);
@@ -272,15 +168,7 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
   useEffect(() => {
     if (didResetOnLoadRef.current) return;
     didResetOnLoadRef.current = true;
-    const params = new URLSearchParams(sp.toString());
-    const had = params.has('belief') || params.has('language');
-    if (had) {
-      params.delete('belief');
-      params.delete('language');
-      const qs = params.toString();
-      router.replace(qs ? `/explorer?${qs}` : '/explorer');
-    }
-  }, [router, sp]);
+  }, []);
 
   const toChurchPublicFromNearby = (r: NearbyChurch): ChurchPublic => ({
     church_id: r.church_id,
@@ -319,10 +207,13 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
   });
 
   const mapPins: ChurchPublic[] = useMemo(() => {
-    return results
-      .filter((r) => typeof r.latitude === 'number' && typeof r.longitude === 'number')
-      .map(toChurchPublicFromNearby)
-  }, [results]);
+    if (searchMode === 'nearby') {
+      return results
+        .filter((r) => typeof r.latitude === 'number' && typeof r.longitude === 'number')
+        .map(toChurchPublicFromNearby)
+    }
+    return baseResults.filter((r) => typeof r.latitude === 'number' && typeof r.longitude === 'number')
+  }, [results, baseResults, searchMode]);
 
   // Removed initial pins switching logic. Map always mirrors filtered results.
 
@@ -374,9 +265,9 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
       {moreFiltersOpen && (
         <div className="flex items-center justify-center">
           <div className="flex gap-3 flex-wrap">
-            <ServiceDayFilter onSelectionChange={setSelectedDays} />
-            <ServiceTimeFilter onTimeChange={setTimeRange} />
-            <ProgramsFilter onQueryChange={setProgramQuery} />
+            <ServiceDayFilter />
+            <ServiceTimeFilter />
+            <ProgramsFilter />
           </div>
         </div>
       )}
@@ -401,16 +292,16 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
 
       {/* Removed keyword search bar in favor of advanced filters */}
 
-      {/* Results list (only render after nearby search) */}
-      {searchMode === 'nearby' && (
+      {/* Results list */}
+      {(
         <>
           {loading && (
-            <div className="text-sm text-gray-600 text-center">Loading nearby churches…</div>
+            <div className="text-sm text-gray-600 text-center">Loading churches…</div>
           )}
 
           <ul className="space-y-3">
             {results.map((r) => {
-              const languages = extractLanguages(r);
+              const languages = Array.isArray(r.service_languages) ? r.service_languages : [];
               const beliefPretty = formatBelief(r.belief_type ?? null);
               return (
                 <li key={r.church_id} className="rounded-lg border bg-white">
@@ -444,7 +335,8 @@ export default function ExplorerClient({ initialPins = [] as Array<{ church_id: 
                           <span>
                             {[r.locality, r.region].filter(Boolean).join(", ")}
                             {(r.locality || r.region) ? " • " : ""}
-                            {r.country} • {formatDistance(r.distance_km)}
+                            {r.country}
+                            {typeof r.distance_km === 'number' && r.distance_km > 0 ? ` • ${formatDistance(r.distance_km)}` : ''}
                           </span>
                         </div>
 

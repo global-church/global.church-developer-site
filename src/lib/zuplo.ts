@@ -61,6 +61,9 @@ export async function searchChurches(params: {
   postal_code?: string;
   languages?: string[];
   programs?: string[];
+  service_days?: string[];
+  service_time_start?: string;
+  service_time_end?: string;
   id?: string;
   limit?: number;
 }): Promise<ChurchPublic[]> {
