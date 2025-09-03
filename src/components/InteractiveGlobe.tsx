@@ -5,12 +5,11 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import Globe, { type GlobeMethods } from 'react-globe.gl';
 import * as THREE from 'three';
-import { Feature } from 'geojson'; // 1. Import the 'Feature' type
+import { Feature } from 'geojson';
 
 export default function InteractiveGlobe() {
-  const globeRef = useRef<GlobeMethods | undefined>();
+  const globeRef = useRef<GlobeMethods | undefined>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  // 2. Use the imported 'Feature' type instead of 'any'
   const [countries, setCountries] = useState<{ features: Feature[] }>({ features: [] });
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 

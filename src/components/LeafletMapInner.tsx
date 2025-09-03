@@ -450,7 +450,7 @@ export default function LeafletMapInner({
           const icon = L.divIcon({ className: '', html, iconSize: [size, size], iconAnchor: [Math.round(size/2), Math.round(size/2)] })
           setBlueIcon(icon)
         } catch (_e) {
-          // no-op
+          console.error("Failed to add clustered markers:", _e);
         }
       }
       create()
