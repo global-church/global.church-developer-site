@@ -1,3 +1,5 @@
+// src/app/layout.tsx
+
 import type { Metadata, Viewport } from "next";
 import { Instrument_Sans, Onest } from "next/font/google";
 import "./globals.css";

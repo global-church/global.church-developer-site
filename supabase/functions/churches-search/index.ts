@@ -163,6 +163,7 @@ serve(async (req)=>{
     const fieldsParam = qp.get("fields"); // e.g., fields=name,latitude,longitude,website
     const fields = fieldsParam ? fieldsParam.split(",").map((s)=>s.trim()).filter((s)=>V1_COLUMNS.has(s)) : null;
     const format = (qp.get("format") || "json").toLowerCase(); // "json" | "geojson"
+    const forGlobe = parseBool(qp, "for_globe") === true;
     let functionName;
     let rpcArgs;
     const baseArgs = {
@@ -175,13 +176,16 @@ serve(async (req)=>{
       p_postal_code,
       p_limit
     };
-    if (radiusProvided) {
+    if (forGlobe) {
+      functionName = "churches_for_globe";
+      rpcArgs = { p_limit };
+    } else if (radiusProvided) {
       functionName = "search_churches_by_radius";
       rpcArgs = {
         ...baseArgs,
         p_lat: center_lat,
         p_lng: center_lng,
-        p_radius_meters: radius_km * 1000,
+        p_radius_meters: (radius_km as number) * 1000,
         p_languages,
         p_programs
       };
