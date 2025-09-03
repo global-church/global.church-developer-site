@@ -449,7 +449,7 @@ export default function LeafletMapInner({
           `
           const icon = L.divIcon({ className: '', html, iconSize: [size, size], iconAnchor: [Math.round(size/2), Math.round(size/2)] })
           setBlueIcon(icon)
-        } catch (e) {
+        } catch (_e) {
           // no-op
         }
       }
