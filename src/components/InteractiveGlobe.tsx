@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { Feature } from 'geojson';
 
 export default function InteractiveGlobe() {
-  const globeRef = useRef<GlobeMethods | undefined>(null);
+  const globeRef = useRef<GlobeMethods>(null!);
   const containerRef = useRef<HTMLDivElement>(null);
   const [countries, setCountries] = useState<{ features: Feature[] }>({ features: [] });
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
