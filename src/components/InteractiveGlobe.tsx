@@ -30,7 +30,7 @@ export default function InteractiveGlobe() {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const hoveredPoint = useMemo(() => churchPoints.find(p => p.id === hoveredId) || null, [churchPoints, hoveredId]);
   const [globeReady, setGlobeReady] = useState(false);
-  const zoomAnimatingRef = useRef<number | null>(null);
+  // removed unused ref from earlier iteration
 
   // Fetch data and set initial globe view
   useEffect(() => {

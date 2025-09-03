@@ -218,8 +218,8 @@ export async function searchChurchesGeoJSON(params: {
   };
 
   const features = (items || []).map((r) => {
-    const lon = (r.longitude ?? (r as any).lng) as number | null;
-    const lat = (r.latitude ?? (r as any).lat) as number | null;
+    const lon = (r.longitude ?? (r as unknown as { lng?: number }).lng ?? null) as number | null;
+    const lat = (r.latitude ?? (r as unknown as { lat?: number }).lat ?? null) as number | null;
     const geometry = lon != null && lat != null ? ({ type: 'Point', coordinates: [lon, lat] } as Geometry) : null;
     const props = project(r) as GeoJsonProperties;
     return { type: 'Feature', geometry, properties: props } as unknown as FeatureCollection['features'][number];
