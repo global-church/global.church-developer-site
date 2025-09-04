@@ -86,6 +86,9 @@ export async function searchChurchesByBbox(params: {
   postal_code?: string;
   languages?: string[];
   programs?: string[];
+  service_days?: string[];
+  service_time_start?: string;
+  service_time_end?: string;
   limit?: number;
 }): Promise<ChurchPublic[]> {
   return fetchFromZuploAPI<ChurchPublic[]>(params);
@@ -106,6 +109,9 @@ export async function searchChurchesByRadius(params: {
   postal_code?: string;
   languages?: string[];
   programs?: string[];
+  service_days?: string[];
+  service_time_start?: string;
+  service_time_end?: string;
   limit?: number;
 }): Promise<ChurchWithinRadiusRow[]> {
   return fetchFromZuploAPI<ChurchWithinRadiusRow[]>(params);
