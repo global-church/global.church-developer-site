@@ -3,6 +3,7 @@
 import { Bookmark, MapPin } from 'lucide-react'
 import Link from 'next/link'
 import { ChurchPublic } from '@/lib/types'
+import { formatLanguages } from '@/lib/languages'
 
 interface ChurchCardProps {
   church: ChurchPublic
@@ -35,6 +36,8 @@ export default function ChurchCard({ church, showBookmark = true, showMapButton 
       // ignore parsing errors
     }
   }
+
+  const languageNames = formatLanguages(languages)
   
   if (variant === 'compact') {
     return (
@@ -47,9 +50,9 @@ export default function ChurchCard({ church, showBookmark = true, showMapButton 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="font-medium text-gray-900 truncate">{church.name}</div>
-                {languages.length > 0 && (
+                {languageNames.length > 0 && (
                   <div className="flex items-center gap-1 flex-shrink-0 overflow-hidden">
-                    {languages.map((lang, idx) => (
+                    {languageNames.map((lang, idx) => (
                       <span key={`${lang}-${idx}`} className="inline-flex items-center rounded-md bg-gray-100 text-gray-700 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
                         {lang}
                       </span>
@@ -90,9 +93,9 @@ export default function ChurchCard({ church, showBookmark = true, showMapButton 
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-gray-900 text-lg mb-1 flex items-center gap-2 min-w-0">
               <span className="truncate">{church.name}</span>
-              {languages.length > 0 && (
+              {languageNames.length > 0 && (
                 <div className="flex items-center gap-1 flex-wrap">
-                  {languages.map((lang, idx) => (
+                  {languageNames.map((lang, idx) => (
                     <span key={`${lang}-${idx}`} className="inline-flex items-center rounded-md bg-gray-100 text-gray-700 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
                       {lang}
                     </span>

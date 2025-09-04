@@ -27,18 +27,23 @@ type BeliefValue = typeof BELIEF_OPTIONS[number]['value']
 export default function MobileSearch({ context = 'home', initialQuery = '' }: MobileSearchProps) {
   const [searchQuery, setSearchQuery] = useState(initialQuery)
   const [filterOpen, setFilterOpen] = useState(false)
-  const [selectedBeliefs, setSelectedBeliefs] = useState<Set<BeliefValue>>(new Set())
+  const [selectedBeliefs, setSelectedBeliefs] = useState<Set<BeliefValue>>(new Set((BELIEF_OPTIONS as readonly { value: string; label: string }[]).map(o => o.value as BeliefValue)))
   const router = useRouter()
   const sp = useSearchParams()
 
   useEffect(() => {
     const raw = sp.get('belief') || ''
     const next = new Set<BeliefValue>()
-    raw.split(',').map((s) => s.trim().toLowerCase()).forEach((s) => {
-      if ((BELIEF_OPTIONS as readonly { value: string; label: string }[]).some((o) => o.value === s)) {
-        next.add(s as BeliefValue)
-      }
-    })
+    const parts = raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+    if (parts.length === 0) {
+      (BELIEF_OPTIONS as readonly { value: string; label: string }[]).forEach(o => next.add(o.value as BeliefValue))
+    } else {
+      parts.forEach((s) => {
+        if ((BELIEF_OPTIONS as readonly { value: string; label: string }[]).some((o) => o.value === s)) {
+          next.add(s as BeliefValue)
+        }
+      })
+    }
     setSelectedBeliefs(next)
   }, [sp])
 
@@ -49,7 +54,10 @@ export default function MobileSearch({ context = 'home', initialQuery = '' }: Mo
     if (!q) return
     const params = new URLSearchParams()
     params.set('q', q)
-    if (selectedBeliefs.size) params.set('belief', Array.from(selectedBeliefs).join(','))
+    const allValues = (BELIEF_OPTIONS as readonly { value: string; label: string }[]).map(o => o.value)
+    const selectedValues = Array.from(selectedBeliefs)
+    const isAll = selectedValues.length === allValues.length
+    if (!isAll && selectedValues.length) params.set('belief', selectedValues.join(','))
     const language = sp.get('language')
     if (language) params.set('language', language)
     router.push(`/explorer${params.toString() ? `?${params.toString()}` : ''}`)
@@ -71,10 +79,13 @@ export default function MobileSearch({ context = 'home', initialQuery = '' }: Mo
   }
 
   function applyFilters() {
-    const csv = Array.from(selectedBeliefs).join(',')
+    const allValues = (BELIEF_OPTIONS as readonly { value: string; label: string }[]).map(o => o.value)
+    const selectedValues = Array.from(selectedBeliefs)
+    const isAll = selectedValues.length === allValues.length
+    const csv = selectedValues.join(',')
     const language = sp.get('language')
     const params = new URLSearchParams()
-    if (csv) params.set('belief', csv)
+    if (csv && !isAll) params.set('belief', csv)
     if (language) params.set('language', language)
     router.push(`/explorer${params.toString() ? `?${params.toString()}` : ''}`)
     setFilterOpen(false)
@@ -157,5 +168,4 @@ export default function MobileSearch({ context = 'home', initialQuery = '' }: Mo
     </div>
   )
 }
-
 

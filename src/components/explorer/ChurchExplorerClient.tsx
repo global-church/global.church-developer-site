@@ -14,8 +14,54 @@ import ServiceDayFilter from "@/components/explorer/filters/ServiceDayFilter";
 import ServiceTimeFilter from "./filters/ServiceTimeFilter";
 import ProgramsFilter from "./filters/ProgramsFilter";
 import { searchChurches } from "@/lib/zuplo";
+import { formatLanguages, normalizeLanguagesToCodes } from "@/lib/languages";
 
 // Client-side parsing/filtering removed in favor of backend filtering
+
+// Service time helpers (module scope for stable identities)
+const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'] as const;
+const DAY_ABBR = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as const;
+const minutesToDayIndex = (m: number) => Math.max(0, Math.min(6, Math.floor(m / 1440)));
+const minutesToTimeString = (m: number) => {
+  const mins = ((m % 1440) + 1440) % 1440;
+  const hh = Math.floor(mins / 60);
+  const mm = mins % 60;
+  const h12 = ((hh + 11) % 12) + 1;
+  const ampm = hh >= 12 ? 'PM' : 'AM';
+  return `${h12}:${mm.toString().padStart(2,'0')} ${ampm}`;
+};
+const formatServiceTimes = (times?: number[] | null) => {
+  if (!Array.isArray(times) || times.length === 0) return [] as { label: string; day: string; minutes: number }[];
+  return times
+    .filter((n) => Number.isFinite(n))
+    .map((n) => {
+      const d = minutesToDayIndex(n);
+      return { label: `${DAY_ABBR[d]} ${minutesToTimeString(n)}`, day: DAY_NAMES[d], minutes: n };
+    })
+    .sort((a, b) => a.minutes - b.minutes);
+};
+
+// Parse HH:MM (24h) to minutes since start of day
+const parseTimeParam = (s?: string | null): number | undefined => {
+  if (!s) return undefined;
+  const m = String(s).trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return undefined;
+  const hh = Math.min(23, Math.max(0, Number(m[1])));
+  const mm = Math.min(59, Math.max(0, Number(m[2])));
+  return hh * 60 + mm;
+};
+
+const inTimeRange = (minuteOfDay: number, start?: number, end?: number): boolean => {
+  if (start == null && end == null) return true;
+  if (start != null && end == null) return minuteOfDay >= start;
+  if (start == null && end != null) return minuteOfDay <= end;
+  if (start != null && end != null) {
+    if (start <= end) return minuteOfDay >= start && minuteOfDay <= end;
+    // wrap-around (e.g., 22:00 to 02:00)
+    return minuteOfDay >= start || minuteOfDay <= end;
+  }
+  return true;
+};
 
 export default function ExplorerClient() {
   const [searchMode, setSearchMode] = useState<'initial' | 'nearby'>('initial');
@@ -39,9 +85,15 @@ export default function ExplorerClient() {
     async function load() {
       setLoading(true);
       try {
-        const belief = sp.get('belief') || undefined;
+        const rawBelief = sp.get('belief') || '';
+        const beliefParts = rawBelief.split(',').map((s) => s.trim()).filter(Boolean);
+        const ALL_BELIEFS = ['protestant','roman_catholic','orthodox','anglican','other'] as const;
+        const belief: string | string[] | undefined = beliefParts.length === 0 || beliefParts.length === ALL_BELIEFS.length
+          ? undefined
+          : (beliefParts.length === 1 ? beliefParts[0] : beliefParts);
         const languageCsv = sp.get('language') || '';
-        const languages = languageCsv ? languageCsv.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+        const uiLanguages = languageCsv ? languageCsv.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+        const languages = normalizeLanguagesToCodes(uiLanguages);
         const serviceDayCsv = sp.get('service_days') || '';
         const service_days = serviceDayCsv ? serviceDayCsv.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
         const service_time_start = sp.get('service_time_start') || undefined;
@@ -49,25 +101,38 @@ export default function ExplorerClient() {
         const programsStr = sp.get('programs') || '';
         const programs = programsStr ? [programsStr] : undefined;
 
-        const rows = await searchChurches({
-          belief,
-          languages,
-          service_days,
-          service_time_start,
-          service_time_end,
-          programs,
-          // fetch all by default
-        });
-        if (!isActive) return;
-        setServerResults(Array.isArray(rows) ? rows : []);
-        setSearchMode('initial');
+        if (searchMode === 'nearby' && userLocation) {
+          // In nearby mode, refetch radius results when filters change
+          const radiusForRpcKm = unit === "km" ? radiusKm : radiusKm * 1.60934;
+          const data = await fetchNearbyChurches(
+            userLocation.lat,
+            userLocation.lng,
+            radiusForRpcKm,
+            50,
+            { belief, languages, service_days, service_time_start, service_time_end, programs }
+          );
+          if (!isActive) return;
+          setNearbyResults(data);
+        } else {
+          const rows = await searchChurches({
+            belief,
+            languages,
+            service_days,
+            service_time_start,
+            service_time_end,
+            programs,
+          });
+          if (!isActive) return;
+          setServerResults(Array.isArray(rows) ? rows : []);
+          setSearchMode('initial');
+        }
       } finally {
         if (isActive) setLoading(false);
       }
     }
     load();
     return () => { isActive = false };
-  }, [sp]);
+  }, [sp, searchMode, userLocation, radiusKm, unit]);
 
   const onLocated = useCallback(
     async ({ lat, lng, accuracy, isHighAccuracy }: { lat: number; lng: number; accuracy: number; isHighAccuracy: boolean }) => {
@@ -75,7 +140,31 @@ export default function ExplorerClient() {
       setLoading(true);
       try {
         const radiusForRpcKm = unit === "km" ? radiusKm : radiusKm * 1.60934;
-        const data = await fetchNearbyChurches(lat, lng, radiusForRpcKm, 50);
+        // Pull current filters from URL
+        const rawBelief = sp.get('belief') || '';
+        const beliefParts = rawBelief.split(',').map((s) => s.trim()).filter(Boolean);
+        const ALL_BELIEFS = ['protestant','roman_catholic','orthodox','anglican','other'] as const;
+        const belief: string | string[] | undefined = beliefParts.length === 0 || beliefParts.length === ALL_BELIEFS.length
+          ? undefined
+          : (beliefParts.length === 1 ? beliefParts[0] : beliefParts);
+        const languageCsv = sp.get('language') || '';
+        const uiLanguages = languageCsv ? languageCsv.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+        const languages = normalizeLanguagesToCodes(uiLanguages);
+        const serviceDayCsv = sp.get('service_days') || '';
+        const service_days = serviceDayCsv ? serviceDayCsv.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+        const service_time_start = sp.get('service_time_start') || undefined;
+        const service_time_end = sp.get('service_time_end') || undefined;
+        const programsStr = sp.get('programs') || '';
+        const programs = programsStr ? [programsStr] : undefined;
+
+        const data = await fetchNearbyChurches(lat, lng, radiusForRpcKm, 50, {
+          belief,
+          languages,
+          service_days,
+          service_time_start,
+          service_time_end,
+          programs,
+        });
         const arr = data as unknown as NearbyChurch[];
         setNearbyResults(arr);
         setSearchMode('nearby');
@@ -95,7 +184,7 @@ export default function ExplorerClient() {
         setLoading(false);
       }
     },
-    [radiusKm, unit]
+    [radiusKm, unit, sp]
   );
 
   // Restore mode and results after remounts due to URL param changes
@@ -155,9 +244,38 @@ export default function ExplorerClient() {
       country: r.country,
       website: r.website,
       service_languages: Array.isArray(r.service_languages) ? r.service_languages : null,
+      service_times: Array.isArray(r.service_times) ? r.service_times : null,
       belief_type: (r.belief_type as NearbyChurch['belief_type']) ?? null,
     }));
   }, [baseResults, nearbyResults, searchMode]);
+
+  const selectedServiceDays = useMemo(() => {
+    const raw = sp.get('service_days') || '';
+    const set = new Set(raw.split(',').map((s) => s.trim()).filter(Boolean));
+    return set;
+  }, [sp]);
+
+  const resultsFiltered: NearbyChurch[] = useMemo(() => {
+    const startParam = sp.get('service_time_start');
+    const endParam = sp.get('service_time_end');
+    const startM = parseTimeParam(startParam);
+    const endM = parseTimeParam(endParam);
+    if (selectedServiceDays.size === 0 && startM == null && endM == null) return results;
+    return results.filter((r) => {
+      const arr = Array.isArray((r as { service_times?: number[] }).service_times)
+        ? ((r as { service_times?: number[] }).service_times as number[])
+        : [];
+      if (arr.length === 0) return false;
+      for (const n of arr) {
+        const day = DAY_NAMES[minutesToDayIndex(n)];
+        const timeOfDay = ((n % 1440) + 1440) % 1440;
+        const dayOk = selectedServiceDays.size === 0 || selectedServiceDays.has(day);
+        const timeOk = inTimeRange(timeOfDay, startM, endM);
+        if (dayOk && timeOk) return true;
+      }
+      return false;
+    });
+  }, [results, selectedServiceDays, sp]);
 
   useEffect(() => {
     setFitKey((k) => k + 1);
@@ -299,9 +417,19 @@ export default function ExplorerClient() {
           )}
 
           <ul className="space-y-3">
-            {results.map((r) => {
+            {resultsFiltered.map((r) => {
               const languages = Array.isArray(r.service_languages) ? r.service_languages : [];
+              const languageNames = formatLanguages(languages);
               const beliefPretty = formatBelief(r.belief_type ?? null);
+              let times = formatServiceTimes((r as { service_times?: number[] }).service_times as number[] | undefined);
+              if (selectedServiceDays.size > 0) {
+                times = times.filter((t) => selectedServiceDays.has(t.day));
+              }
+              const startM = parseTimeParam(sp.get('service_time_start'));
+              const endM = parseTimeParam(sp.get('service_time_end'));
+              if (startM != null || endM != null) {
+                times = times.filter((t) => inTimeRange(((t.minutes % 1440) + 1440) % 1440, startM, endM));
+              }
               return (
                 <li key={r.church_id} className="rounded-lg border bg-white">
                   <a href={`/church/${r.church_id}`} className="block p-4 group">
@@ -318,7 +446,7 @@ export default function ExplorerClient() {
                                 {beliefPretty}
                               </span>
                             )}
-                            {languages.map((lang, idx) => (
+                            {languageNames.map((lang, idx) => (
                               <span
                                 key={`${lang}-${idx}`}
                                 className="inline-flex items-center rounded-md bg-gray-100 text-gray-700 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap"
@@ -326,6 +454,16 @@ export default function ExplorerClient() {
                                 {lang}
                               </span>
                             ))}
+                            <span className="flex-1" />
+                            {times.length > 0 && (
+                              <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
+                                {times.slice(0, 3).map((t, idx) => (
+                                  <span key={`${r.church_id}-t-${idx}`} className="inline-flex items-center rounded-full bg-gray-900/90 text-white px-2.5 py-0.5 text-[10px] font-medium shadow-sm">
+                                    {t.label}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -358,7 +496,7 @@ export default function ExplorerClient() {
             })}
           </ul>
 
-          {!loading && results.length === 0 && (
+          {!loading && resultsFiltered.length === 0 && (
             <p className="text-sm text-gray-600 text-center">
               No nearby churches match your filters.
             </p>
@@ -368,5 +506,3 @@ export default function ExplorerClient() {
     </section>
   );
 }
-
-

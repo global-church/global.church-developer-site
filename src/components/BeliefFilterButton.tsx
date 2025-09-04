@@ -20,23 +20,26 @@ import { useCallback } from 'react'
 export default function BeliefFilterButton() {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const [selected, setSelected] = useState<Set<BeliefValue>>(new Set())
+  const [selected, setSelected] = useState<Set<BeliefValue>>(new Set((BELIEF_OPTIONS as readonly { value: string; label: string }[]).map(o => o.value as BeliefValue)))
   const router = useRouter()
   const sp = useSearchParams()
   const pathname = usePathname()
 
-  // Sync from current URL
+  // Sync from current URL (default to all selected when absent)
   useEffect(() => {
     const raw = sp.get('belief') || ''
     const next = new Set<BeliefValue>()
-    raw
-      .split(',')
-      .map((s) => s.trim().toLowerCase())
-      .forEach((s) => {
+    const parts = raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+    if (parts.length === 0) {
+      // No URL param => select all by default
+      (BELIEF_OPTIONS as readonly { value: string; label: string }[]).forEach(o => next.add(o.value as BeliefValue))
+    } else {
+      parts.forEach((s) => {
         if ((BELIEF_OPTIONS as readonly { value: string; label: string }[]).some((o) => o.value === s)) {
           next.add(s as BeliefValue)
         }
       })
+    }
     setSelected(next)
   }, [sp])
 
@@ -51,8 +54,11 @@ export default function BeliefFilterButton() {
 
   const apply = useCallback(() => {
     const params = new URLSearchParams(sp.toString())
-    const csv = Array.from(selected).join(',')
-    if (csv) params.set('belief', csv)
+    const allValues = (BELIEF_OPTIONS as readonly { value: string; label: string }[]).map(o => o.value)
+    const selectedValues = Array.from(selected)
+    const isAll = selectedValues.length === allValues.length
+    const csv = selectedValues.join(',')
+    if (csv && !isAll) params.set('belief', csv)
     else params.delete('belief')
     const qs = params.toString()
     router.push(qs ? `${pathname}?${qs}` : pathname)
@@ -131,5 +137,4 @@ export default function BeliefFilterButton() {
     </div>
   )
 }
-
 

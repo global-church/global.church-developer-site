@@ -55,7 +55,7 @@ async function fetchFromZuploAPI<T>(params: Record<string, unknown>): Promise<T>
 export async function searchChurches(params: {
   q?: string;
   country?: string;
-  belief?: string;
+  belief?: string | string[];
   trinitarian?: boolean;
   region?: string;
   locality?: string;
@@ -79,7 +79,7 @@ export async function searchChurchesByBbox(params: {
   max_lng: number;
   q?: string;
   country?: string;
-  belief?: string;
+  belief?: string | string[];
   trinitarian?: boolean;
   region?: string;
   locality?: string;
@@ -99,7 +99,7 @@ export async function searchChurchesByRadius(params: {
   radius_km: number;
   q?: string;
   country?: string;
-  belief?: string;
+  belief?: string | string[];
   trinitarian?: boolean;
   region?: string;
   locality?: string;

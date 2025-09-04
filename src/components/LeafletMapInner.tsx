@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { MutableRefObject } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, ZoomControl, useMap, Circle } from 'react-leaflet'
 import Supercluster from 'supercluster'
 import type { DivIcon, LatLngBoundsExpression } from 'leaflet'
@@ -8,6 +9,7 @@ import 'leaflet/dist/leaflet.css'
 import Link from 'next/link'
 import * as GeoJSON from 'geojson'
 import { searchChurchesByBbox } from '@/lib/zuplo'
+import { formatLanguages } from '@/lib/languages'
 
 // ChurchPin type is now defined in ChurchMap.tsx
 
@@ -19,6 +21,162 @@ function interpolateSize(zoom: number, minZoom: number, maxZoom: number, minSize
   const z = clamp(zoom, minZoom, maxZoom)
   const t = (z - minZoom) / (maxZoom - minZoom)
   return Math.round(minSize + t * (maxSize - minSize))
+}
+
+// Hoisted components to avoid remount loops
+function ClusterMarker({ lat, lng, id, count, index, zoomLevel }: { lat: number; lng: number; id: number; count: number; index: Supercluster; zoomLevel: number }) {
+  const map = useMap()
+  const Lw = (typeof window !== 'undefined' ? (window as unknown as { L?: { divIcon: (opts: { html: string; className: string; iconSize: [number, number]; iconAnchor: [number, number] }) => DivIcon } }).L : undefined) || null
+  const size = interpolateSize(zoomLevel, 3, 12, 25, 30)
+  const border = Math.max(2, Math.round(size * 0.08))
+  const inset = Math.round(size * 0.175)
+  const fontSize = Math.max(10, Math.round(size * 0.3))
+  const icon = Lw ? Lw.divIcon({
+    html: `
+      <div style="
+        width: ${size}px; height: ${size}px; border-radius: 50%;
+        background: #000; border: ${border}px solid #fff;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 6px 14px rgba(0,0,0,0.25);
+        position: relative;
+      ">
+        <div style="position:absolute; inset: ${inset}px; border-radius: 50%; background:#fff;"></div>
+        <span style="position:relative; z-index:1; color:#000; font-weight:800; font-size:${fontSize}px;">${count}</span>
+      </div>
+    `,
+    className: '', iconSize: [size, size], iconAnchor: [Math.round(size/2), Math.round(size/2)]
+  }) : undefined
+
+  return (
+    <Marker
+      position={[lat, lng]}
+      icon={icon as unknown as DivIcon}
+      eventHandlers={{
+        click: () => {
+          const expansionZoom = Math.min(index.getClusterExpansionZoom(id), 18)
+          map.setView([lat, lng], expansionZoom, { animate: true })
+        },
+      }}
+    />
+  )
+}
+
+function MapStateSyncCore({ onChange, padding = 0.75, userInteractingRef }: { onChange: (map: ReturnType<typeof useMap>, padding?: number) => void; padding?: number; userInteractingRef: MutableRefObject<boolean> }) {
+  const map = useMap()
+  useEffect(() => {
+    const update = () => onChange(map, padding)
+    update()
+    map.on('moveend', update)
+    map.on('zoomend', update)
+    const onStart = () => { userInteractingRef.current = true }
+    const onEnd = () => { userInteractingRef.current = false }
+    map.on('movestart', onStart)
+    map.on('dragstart', onStart)
+    map.on('zoomstart', onStart)
+    map.on('dragend', onEnd)
+    map.on('zoomend', onEnd)
+    map.on('moveend', onEnd)
+    return () => {
+      map.off('moveend', update)
+      map.off('zoomend', update)
+      map.off('movestart', onStart)
+      map.off('dragstart', onStart)
+      map.off('zoomstart', onStart)
+      map.off('dragend', onEnd)
+      map.off('zoomend', onEnd)
+      map.off('moveend', onEnd)
+    }
+  }, [map, onChange, padding, userInteractingRef])
+  return null
+}
+
+function FitToPins({ pinsToFit, triggerKey, lastAppliedFitKeyRef, userInteractingRef }: { pinsToFit: Array<{ latitude: number; longitude: number }>; triggerKey: number | undefined; lastAppliedFitKeyRef: MutableRefObject<number>; userInteractingRef: MutableRefObject<boolean> }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!pinsToFit || pinsToFit.length === 0) return
+    if (typeof triggerKey !== 'number') return
+    if (triggerKey === lastAppliedFitKeyRef.current) return
+    if (userInteractingRef.current) return
+    let minLat = 90, minLng = 180, maxLat = -90, maxLng = -180
+    for (const p of pinsToFit) {
+      const lat = Number((p as { latitude: number }).latitude)
+      const lng = Number((p as { longitude: number }).longitude)
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue
+      if (lat < minLat) minLat = lat
+      if (lng < minLng) minLng = lng
+      if (lat > maxLat) maxLat = lat
+      if (lng > maxLng) maxLng = lng
+    }
+    if (!(Number.isFinite(minLat) && Number.isFinite(minLng) && Number.isFinite(maxLat) && Number.isFinite(maxLng))) return
+
+    const size = map.getSize()
+    const padX = Math.max(0, Math.round(size.x * 0.1))
+    const padY = Math.max(0, Math.round(size.y * 0.1))
+
+    if (Math.abs(maxLat - minLat) < 1e-9 && Math.abs(maxLng - minLng) < 1e-9) {
+      const maxZoomFromMap = (map as unknown as { getMaxZoom?: () => number }).getMaxZoom?.()
+      const targetZoom = Number.isFinite(maxZoomFromMap) ? Math.min(18, Number(maxZoomFromMap)) : 18
+      map.setView([minLat, minLng], targetZoom, { animate: true })
+      lastAppliedFitKeyRef.current = triggerKey
+      return
+    }
+
+    const bounds: [[number, number], [number, number]] = [[minLat, minLng], [maxLat, maxLng]]
+    const opts = { paddingTopLeft: [padX, padY] as [number, number], paddingBottomRight: [padX, padY] as [number, number], maxZoom: 18, animate: true }
+    const leafMap = map as unknown as {
+      flyToBounds?: (b: typeof bounds, o: typeof opts) => void
+      fitBounds: (b: typeof bounds, o: typeof opts) => void
+    }
+    if (typeof leafMap.flyToBounds === 'function') {
+      leafMap.flyToBounds(bounds, opts)
+    } else {
+      leafMap.fitBounds(bounds, opts)
+    }
+    lastAppliedFitKeyRef.current = triggerKey
+  }, [triggerKey, map, pinsToFit, lastAppliedFitKeyRef, userInteractingRef])
+  return null
+}
+
+function UserLocationLayer({ loc }: { loc: { lat: number; lng: number; accuracy: number; isHighAccuracy: boolean } }) {
+  const map = useMap()
+  const hasPannedRef = useRef(false)
+
+  useEffect(() => {
+    if (!loc) return
+    if (hasPannedRef.current) return
+    try {
+      map.panTo([loc.lat, loc.lng], { animate: true })
+    } catch {
+      // ignore
+    }
+    hasPannedRef.current = true
+  }, [loc, map])
+
+  if (!loc) return null
+
+  if (loc.isHighAccuracy) {
+    const Lw = (typeof window !== 'undefined' ? (window as unknown as { L?: { divIcon: (opts: { html: string; className: string; iconSize: [number, number]; iconAnchor: [number, number] }) => DivIcon } }).L : undefined) || null
+    if (!Lw) return null
+    const size = 14
+    const border = 2
+    const html = `
+      <div style="
+        width: ${size}px; height: ${size}px; border-radius: 50%;
+        background: #0A84FF; border: ${border}px solid #fff;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      "></div>
+    `
+    const blueIcon = Lw.divIcon({ className: '', html, iconSize: [size, size], iconAnchor: [Math.round(size/2), Math.round(size/2)] })
+    return <Marker position={[loc.lat, loc.lng]} icon={blueIcon} />
+  }
+  const radius = Math.max(0, Number(loc.accuracy))
+  return (
+    <Circle
+      center={[loc.lat, loc.lng]}
+      radius={radius}
+      pathOptions={{ color: '#0A84FF', fillColor: '#0A84FF', fillOpacity: 0.15, opacity: 0.4, weight: 2 }}
+    />
+  )
 }
 
 export default function LeafletMapInner({
@@ -76,44 +234,7 @@ export default function LeafletMapInner({
     geojson?: { type: 'Point'; coordinates: [number, number] } | null
   }
 
-  // Cluster marker with smooth flyTo animation
-  function ClusterMarker({ lat, lng, id, count, index }: { lat: number; lng: number; id: number; count: number; index: Supercluster }) {
-    const map = useMap()
-    const Lw = (typeof window !== 'undefined' ? (window as unknown as { L?: { divIcon: (opts: { html: string; className: string; iconSize: [number, number]; iconAnchor: [number, number] }) => DivIcon } }).L : undefined) || null
-    const size = interpolateSize(zoomLevel, 3, 12, 25, 30)
-    const border = Math.max(2, Math.round(size * 0.08))
-    const inset = Math.round(size * 0.175)
-    const fontSize = Math.max(10, Math.round(size * 0.3))
-    const icon = Lw ? Lw.divIcon({
-      html: `
-        <div style="
-          width: ${size}px; height: ${size}px; border-radius: 50%;
-          background: #000; border: ${border}px solid #fff;
-          display: flex; align-items: center; justify-content: center;
-          box-shadow: 0 6px 14px rgba(0,0,0,0.25);
-          position: relative;
-        ">
-          <div style="position:absolute; inset: ${inset}px; border-radius: 50%; background:#fff;"></div>
-          <span style="position:relative; z-index:1; color:#000; font-weight:800; font-size:${fontSize}px;">${count}</span>
-        </div>
-      `,
-      className: '', iconSize: [size, size], iconAnchor: [Math.round(size/2), Math.round(size/2)]
-    }) : undefined
-
-    return (
-      <Marker
-        position={[lat, lng]}
-        icon={icon as unknown as DivIcon}
-        eventHandlers={{
-          click: () => {
-            const expansionZoom = Math.min(index.getClusterExpansionZoom(id), 18)
-            // Smooth animated transition
-            map.setView([lat, lng], expansionZoom, { animate: true })
-          },
-        }}
-      />
-    )
-  }
+  // (ClusterMarker moved to module scope)
   type FeaturePoint = GeoJSON.Feature<GeoJSON.Point, { cluster: false; church_id: string; point: ChurchPointProps }>
   type ClusterFeature = GeoJSON.Feature<GeoJSON.Point, { cluster: true; point_count: number; point_count_abbreviated: number }>
 
@@ -346,143 +467,12 @@ export default function LeafletMapInner({
     }
   }, [bounds, disableViewportFetch])
 
-  function MapStateSyncCore({ onChange, padding = 0.75 }: { onChange: (map: ReturnType<typeof useMap>, padding?: number) => void; padding?: number }) {
-    const map = useMap()
-    useEffect(() => {
-      const update = () => onChange(map, padding)
-      update()
-      map.on('moveend', update)
-      map.on('zoomend', update)
-      const onStart = () => { userInteractingRef.current = true }
-      const onEnd = () => { userInteractingRef.current = false }
-      map.on('movestart', onStart)
-      map.on('dragstart', onStart)
-      map.on('zoomstart', onStart)
-      map.on('dragend', onEnd)
-      map.on('zoomend', onEnd)
-      map.on('moveend', onEnd)
-      return () => {
-        map.off('moveend', update)
-        map.off('zoomend', update)
-        map.off('movestart', onStart)
-        map.off('dragstart', onStart)
-        map.off('zoomstart', onStart)
-        map.off('dragend', onEnd)
-        map.off('zoomend', onEnd)
-        map.off('moveend', onEnd)
-      }
-    }, [map, onChange, padding])
-    return null
-  }
+  // (MapStateSyncCore moved to module scope)
 
   // Auto-fit to incoming pins from props (filters/search). Maintain ~20% frame padding (10% each side)
-  function FitToPins({ pinsToFit, triggerKey }: { pinsToFit: typeof pins; triggerKey: number | undefined }) {
-    const map = useMap()
-    useEffect(() => {
-      if (!pinsToFit || pinsToFit.length === 0) return
-      if (typeof triggerKey !== 'number') return
-      if (triggerKey === lastAppliedFitKeyRef.current) return
-      // Do not override user's active interaction
-      if (userInteractingRef.current) return
-      let minLat = 90, minLng = 180, maxLat = -90, maxLng = -180
-      for (const p of pinsToFit) {
-        const lat = Number((p as { latitude: number }).latitude)
-        const lng = Number((p as { longitude: number }).longitude)
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue
-        if (lat < minLat) minLat = lat
-        if (lng < minLng) minLng = lng
-        if (lat > maxLat) maxLat = lat
-        if (lng > maxLng) maxLng = lng
-      }
-      if (!(Number.isFinite(minLat) && Number.isFinite(minLng) && Number.isFinite(maxLat) && Number.isFinite(maxLng))) return
+  // (FitToPins moved to module scope)
 
-      const size = map.getSize()
-      const padX = Math.max(0, Math.round(size.x * 0.1))
-      const padY = Math.max(0, Math.round(size.y * 0.1))
-
-      // If only one point, zoom to the maximum allowed level while centering the pin
-      if (Math.abs(maxLat - minLat) < 1e-9 && Math.abs(maxLng - minLng) < 1e-9) {
-        const maxZoomFromMap = (map as unknown as { getMaxZoom?: () => number }).getMaxZoom?.()
-        const targetZoom = Number.isFinite(maxZoomFromMap) ? Math.min(18, Number(maxZoomFromMap)) : 18
-        map.setView([minLat, minLng], targetZoom, { animate: true })
-        lastAppliedFitKeyRef.current = triggerKey
-        return
-      }
-
-      // Fit tightly with padding so pins fill ~80% inner area; explicitly cap max zoom for a tighter view
-      const bounds: [[number, number], [number, number]] = [[minLat, minLng], [maxLat, maxLng]]
-      const opts = { paddingTopLeft: [padX, padY] as [number, number], paddingBottomRight: [padX, padY] as [number, number], maxZoom: 18, animate: true }
-      const leafMap = map as unknown as {
-        flyToBounds?: (b: typeof bounds, o: typeof opts) => void
-        fitBounds: (b: typeof bounds, o: typeof opts) => void
-      }
-      if (typeof leafMap.flyToBounds === 'function') {
-        // Call as a method to preserve Leaflet's internal `this` binding
-        leafMap.flyToBounds(bounds, opts)
-      } else {
-        leafMap.fitBounds(bounds, opts)
-      }
-      lastAppliedFitKeyRef.current = triggerKey
-    }, [triggerKey, map, pinsToFit])
-    return null
-  }
-
-  function UserLocationLayer({ loc }: { loc: { lat: number; lng: number; accuracy: number; isHighAccuracy: boolean } }) {
-    const map = useMap()
-    const [blueIcon, setBlueIcon] = useState<DivIcon | null>(null)
-    const hasPannedRef = useRef(false)
-
-    useEffect(() => {
-      let cancelled = false
-      const create = async () => {
-        try {
-          const L = await import('leaflet')
-          if (cancelled) return
-          const size = 14
-          const border = 2
-          const html = `
-            <div style="
-              width: ${size}px; height: ${size}px; border-radius: 50%;
-              background: #0A84FF; border: ${border}px solid #fff;
-              box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            "></div>
-          `
-          const icon = L.divIcon({ className: '', html, iconSize: [size, size], iconAnchor: [Math.round(size/2), Math.round(size/2)] })
-          setBlueIcon(icon)
-        } catch (_e) {
-          console.error("Failed to add clustered markers:", _e);
-        }
-      }
-      create()
-      return () => { cancelled = true }
-    }, [])
-
-    useEffect(() => {
-      if (!loc) return
-      if (hasPannedRef.current) return
-      try {
-        map.panTo([loc.lat, loc.lng], { animate: true })
-      } catch {
-        // ignore
-      }
-      hasPannedRef.current = true
-    }, [loc, map])
-
-    if (!loc) return null
-
-    if (loc.isHighAccuracy) {
-      if (!blueIcon) return null
-      return <Marker position={[loc.lat, loc.lng]} icon={blueIcon} />
-    }
-    const radius = Math.max(0, Number(loc.accuracy))
-    return (
-      <Circle
-        center={[loc.lat, loc.lng]}
-        radius={radius}
-        pathOptions={{ color: '#0A84FF', fillColor: '#0A84FF', fillOpacity: 0.15, opacity: 0.4, weight: 2 }}
-      />
-    )
-  }
+  // (UserLocationLayer moved to module scope)
 
 	// Shared map props to prevent infinite zoom-out and vertical gray space
 	const mapProps = {
@@ -519,8 +509,8 @@ export default function LeafletMapInner({
 			<MapContainer {...mapProps} className="h-full w-full">
 				<TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 				<ZoomControl position="topright" />
-				<MapStateSyncCore onChange={handleMapChange} padding={0.75} />
-				<FitToPins pinsToFit={pins} triggerKey={fitKey} />
+				<MapStateSyncCore onChange={handleMapChange} padding={0.75} userInteractingRef={userInteractingRef} />
+				<FitToPins pinsToFit={pins} triggerKey={fitKey} lastAppliedFitKeyRef={lastAppliedFitKeyRef} userInteractingRef={userInteractingRef} />
 				{userLocation && (
 					<UserLocationLayer loc={userLocation} />
 				)}
@@ -535,7 +525,7 @@ export default function LeafletMapInner({
 								const count = cf.properties.point_count
 								const cid = (c as unknown as { id: number }).id
 								return (
-									<ClusterMarker key={`cluster-${String(cid)}`} lat={lat} lng={lng} id={cid} count={count} index={clusterIndex} />
+									<ClusterMarker key={`cluster-${String(cid)}`} lat={lat} lng={lng} id={cid} count={count} index={clusterIndex} zoomLevel={zoomLevel} />
 								)
 							}
 							const fp = c as unknown as FeaturePoint
@@ -555,13 +545,15 @@ export default function LeafletMapInner({
 											{p.belief_type && (
 												<div className="text-xs text-gray-700 capitalize">{String(p.belief_type).replace('_', ' ')}</div>
 											)}
-											{Array.isArray(p.service_languages) && p.service_languages.length > 0 && (
-												p.service_languages.length === 1 ? (
-													<div className="text-xs text-gray-700"><em>{p.service_languages[0]}</em></div>
-												) : (
-													<div className="text-xs text-gray-700">Service Languages: {p.service_languages.join(', ')}</div>
-												)
-											)}
+                                                                                        {(() => {
+                                                                                          const langNames = Array.isArray(p.service_languages) ? formatLanguages(p.service_languages) : []
+                                                                                          if (langNames.length === 0) return null
+                                                                                          return langNames.length === 1 ? (
+                                                                                            <div className="text-xs text-gray-700"><em>{langNames[0]}</em></div>
+                                                                                          ) : (
+                                                                                            <div className="text-xs text-gray-700">Service Languages: {langNames.join(', ')}</div>
+                                                                                          )
+                                                                                        })()}
 											<div className="flex gap-2 text-sm">
 												<Link className="text-green-600 hover:text-green-700 font-medium" href={`/church/${p.church_id}`}>View Details</Link>
 												{p.website && (<><span className="text-gray-300">•</span><a className="text-blue-600 hover:text-blue-700" href={p.website} target="_blank" rel="noopener noreferrer">Website</a></>)}

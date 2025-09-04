@@ -45,11 +45,13 @@ export default function ServiceTimeFilter() {
     return () => document.removeEventListener('mousedown', onDocClick)
   }, [open])
 
+  const active = Boolean(start || end)
+
   return (
     <div className="relative" ref={containerRef}>
       <Button variant="outline" onClick={() => setOpen((v) => !v)} className="px-3 py-1.5 text-sm" aria-expanded={open}>
         <Filter size={16} className="mr-2" />
-        Start Time
+        Start Time{active ? ' (1)' : ''}
       </Button>
       {open && (
         <div className="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-[1000] p-3">
@@ -63,13 +65,12 @@ export default function ServiceTimeFilter() {
               <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="h-9 w-full rounded border px-2" />
             </label>
           </div>
-          <div className="flex justify-end pt-3">
-            <Button size="sm" onClick={() => setOpen(false)}>Done</Button>
+          <div className="flex justify-end gap-2 pt-3">
+            <Button variant="outline" size="sm" onClick={() => { setStart(''); setEnd(''); setOpen(false) }}>Clear</Button>
+            <Button size="sm" onClick={() => setOpen(false)}>Apply</Button>
           </div>
         </div>
       )}
     </div>
   )
 }
-
-

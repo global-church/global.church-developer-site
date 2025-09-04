@@ -2,11 +2,11 @@
 import { searchChurches } from "@/lib/zuplo"
 import { ChurchPublic } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import YouTubeLatest from "@/components/YouTubeLatest"
 import { getFacebookPageUrl } from "@/lib/facebook"
 import FacebookSection from "@/components/FacebookSection"
 import { getChannelIdFromAnyYouTubeUrl } from "@/lib/resolveChannelId"
+import { formatLanguages } from "@/lib/languages"
 import { ArrowLeft, MoreVertical, MapPin, Instagram, Youtube, Mail, ExternalLink, Phone, Facebook } from "lucide-react"
 import Link from "next/link"
 
@@ -42,6 +42,26 @@ export default async function ChurchPage({
   const languages: string[] = Array.isArray(church.service_languages)
     ? church.service_languages
     : (church.service_languages ? String(church.service_languages).split(',').map(s => s.trim()).filter(Boolean) : [])
+  const languageNames = formatLanguages(languages)
+
+  // Format denomination: snake_case -> Title Case with conventional rules
+  const formatDenomination = (input?: string | null): string | null => {
+    if (!input) return null
+    const minorWords = new Set([
+      'a', 'an', 'the',
+      'and', 'but', 'or', 'nor',
+      'as', 'at', 'by', 'for', 'from', 'in', 'into', 'near', 'of', 'on', 'onto', 'over', 'per', 'to', 'via', 'with'
+    ])
+    const words = String(input).replace(/_/g, ' ').trim().split(/\s+/)
+    if (words.length === 0) return null
+    const cased = words.map((word, index) => {
+      const lower = word.toLowerCase()
+      const isEdge = index === 0 || index === words.length - 1
+      if (!isEdge && minorWords.has(lower)) return lower
+      return lower.charAt(0).toUpperCase() + lower.slice(1)
+    }).join(' ')
+    return cased
+  }
 
   // Contact info (prefer structured arrays when available)
   const preferredPhone = (Array.isArray(church.contact_phones) && church.contact_phones.length > 0
@@ -227,13 +247,7 @@ export default async function ChurchPage({
         </div>
       </div>
 
-      {/* Claim Banner */}
-      <div className="bg-green-50 border-b border-green-200 px-4 py-3">
-        <Link href="/claim" className="flex items-center justify-between text-green-800 hover:text-green-900">
-          <span className="text-sm font-medium">Claim Church Profile</span>
-          <span className="text-sm">→</span>
-        </Link>
-      </div>
+      {/* Claim Banner hidden */}
 
       {/* Church Info */}
       <div className="bg-white px-4 py-6">
@@ -248,9 +262,9 @@ export default async function ChurchPage({
         </div>
 
         {/* Service Languages (centered above location) */}
-        {languages.length > 0 && (
+        {languageNames.length > 0 && (
           <div className="flex justify-center flex-wrap gap-2 mb-3">
-            {languages.map((lang, idx) => (
+            {languageNames.map((lang, idx) => (
               <span key={`${lang}-${idx}`} className="inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-3 py-1 text-xs font-medium">
                 {lang}
               </span>
@@ -278,6 +292,11 @@ export default async function ChurchPage({
             <Badge variant="outline">Trinitarian</Badge>
           )}
         </div>
+        {church.denomination && (
+          <div className="mt-2 text-center">
+            <span className="text-sm text-gray-600">{formatDenomination(church.denomination)}</span>
+          </div>
+        )}
       </div>
 
       {/* Details */}
@@ -498,17 +517,7 @@ export default async function ChurchPage({
         })()}
       </div>
 
-      {/* Action Buttons (sit above persistent bottom nav) */}
-      <div className="fixed bottom-20 left-0 right-0 bg-white border-t border-gray-200 px-4 py-4 z-50">
-        <div className="flex gap-3">
-          <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 text-base font-medium">
-            I&apos;m Interested
-          </Button>
-          <Button variant="outline" className="flex-1 border-green-600 text-green-600 hover:bg-green-50 py-3 text-base font-medium">
-            This is My Church
-          </Button>
-        </div>
-      </div>
+      {/* Action Buttons hidden */}
 
       {/* Mobile Navigation provided by global layout (appears below action buttons) */}
     </div>
