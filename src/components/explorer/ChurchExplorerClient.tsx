@@ -431,69 +431,130 @@ export default function ExplorerClient() {
                 times = times.filter((t) => inTimeRange(((t.minutes % 1440) + 1440) % 1440, startM, endM));
               }
               const hasLink = Boolean(r.church_id)
-              const Wrapper: any = hasLink ? 'a' : 'div'
-              const wrapperProps = hasLink ? { href: `/church/${r.church_id}` } : {}
+              // removed polymorphic Wrapper:any for lint compliance
               return (
                 <li key={`${r.church_id || 'no-id'}-${idx}`} className="rounded-lg border bg-white">
-                  <Wrapper {...wrapperProps} className="block p-4 group">
-                    <div className="flex items-start gap-3">
-                      <div className="size-12 rounded-full bg-primary grid place-items-center text-lg font-semibold text-white flex-shrink-0">
-                        {r.name?.charAt(0).toUpperCase() ?? "C"}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="font-medium truncate">{r.name}</div>
-                          <div className="flex items-center gap-1 flex-shrink-0 overflow-hidden">
-                            {beliefPretty && (
-                              <span className="inline-flex items-center rounded-md bg-gray-100 text-gray-700 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
-                                {beliefPretty}
-                              </span>
-                            )}
-                            {languageNames.map((lang, idx) => (
-                              <span
-                                key={`${lang}-${idx}`}
-                                className="inline-flex items-center rounded-md bg-gray-100 text-gray-700 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap"
-                              >
-                                {lang}
-                              </span>
-                            ))}
-                            <span className="flex-1" />
-                            {times.length > 0 && (
-                              <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
-                                {times.slice(0, 3).map((t, idx) => (
-                                  <span key={`${r.church_id}-t-${idx}`} className="inline-flex items-center rounded-full bg-gray-900/90 text-white px-2.5 py-0.5 text-[10px] font-medium shadow-sm">
-                                    {t.label}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
+                  {r.church_id ? (
+                    <a href={`/church/${r.church_id}`} className="block p-4 group">
+                      <div className="flex items-start gap-3">
+                        <div className="size-12 rounded-full bg-primary grid place-items-center text-lg font-semibold text-white flex-shrink-0">
+                          {r.name?.charAt(0).toUpperCase() ?? "C"}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="font-medium truncate">{r.name}</div>
+                            <div className="flex items-center gap-1 flex-shrink-0 overflow-hidden">
+                              {beliefPretty && (
+                                <span className="inline-flex items-center rounded-md bg-gray-100 text-gray-700 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                                  {beliefPretty}
+                                </span>
+                              )}
+                              {languageNames.map((lang, idx) => (
+                                <span
+                                  key={`${lang}-${idx}`}
+                                  className="inline-flex items-center rounded-md bg-gray-100 text-gray-700 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap"
+                                >
+                                  {lang}
+                                </span>
+                              ))}
+                              <span className="flex-1" />
+                              {times.length > 0 && (
+                                <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
+                                  {times.slice(0, 3).map((t, idx) => (
+                                    <span key={`${r.church_id}-t-${idx}`} className="inline-flex items-center rounded-full bg-gray-900/90 text-white px-2.5 py-0.5 text-[10px] font-medium shadow-sm">
+                                      {t.label}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="text-sm text-gray-600 flex items-center gap-1">
+                            <MapPin size={14} className="opacity-0" />
+                            <span>
+                              {[r.locality, r.region].filter(Boolean).join(", ")}
+                              {(r.locality || r.region) ? " • " : ""}
+                              {r.country}
+                              {typeof r.distance_km === 'number' && r.distance_km > 0 ? ` • ${formatDistance(r.distance_km)}` : ''}
+                            </span>
+                          </div>
+
+                          {r.address && (
+                            <div className="text-sm text-gray-700 flex items-center gap-1">
+                              <MapPin size={14} className="text-gray-500" />
+                              <span>{r.address}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-shrink-0 self-center">
+                          <div className="size-7 grid place-items-center rounded-full bg-gray-100 text-gray-500 group-hover:bg-gray-200">
+                            <ChevronRight size={16} />
                           </div>
                         </div>
-
-                        <div className="text-sm text-gray-600 flex items-center gap-1">
-                          <MapPin size={14} className="opacity-0" />
-                          <span>
-                            {[r.locality, r.region].filter(Boolean).join(", ")}
-                            {(r.locality || r.region) ? " • " : ""}
-                            {r.country}
-                            {typeof r.distance_km === 'number' && r.distance_km > 0 ? ` • ${formatDistance(r.distance_km)}` : ''}
-                          </span>
-                        </div>
-
-                        {r.address && (
-                          <div className="text-sm text-gray-700 flex items-center gap-1">
-                            <MapPin size={14} className="text-gray-500" />
-                            <span>{r.address}</span>
-                          </div>
-                        )}
                       </div>
-                      <div className="flex-shrink-0 self-center">
-                        <div className="size-7 grid place-items-center rounded-full bg-gray-100 text-gray-500 group-hover:bg-gray-200">
-                          <ChevronRight size={16} />
+                    </a>
+                  ) : (
+                    <div className="block p-4 group">
+                      <div className="flex items-start gap-3">
+                        <div className="size-12 rounded-full bg-primary grid place-items-center text-lg font-semibold text-white flex-shrink-0">
+                          {r.name?.charAt(0).toUpperCase() ?? "C"}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="font-medium truncate">{r.name}</div>
+                            <div className="flex items-center gap-1 flex-shrink-0 overflow-hidden">
+                              {beliefPretty && (
+                                <span className="inline-flex items-center rounded-md bg-gray-100 text-gray-700 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                                  {beliefPretty}
+                                </span>
+                              )}
+                              {languageNames.map((lang, idx) => (
+                                <span
+                                  key={`${lang}-${idx}`}
+                                  className="inline-flex items-center rounded-md bg-gray-100 text-gray-700 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap"
+                                >
+                                  {lang}
+                                </span>
+                              ))}
+                              <span className="flex-1" />
+                              {times.length > 0 && (
+                                <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
+                                  {times.slice(0, 3).map((t, idx) => (
+                                    <span key={`noid-t-${idx}`} className="inline-flex items-center rounded-full bg-gray-900/90 text-white px-2.5 py-0.5 text-[10px] font-medium shadow-sm">
+                                      {t.label}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="text-sm text-gray-600 flex items-center gap-1">
+                            <MapPin size={14} className="opacity-0" />
+                            <span>
+                              {[r.locality, r.region].filter(Boolean).join(", ")}
+                              {(r.locality || r.region) ? " • " : ""}
+                              {r.country}
+                              {typeof r.distance_km === 'number' && r.distance_km > 0 ? ` • ${formatDistance(r.distance_km)}` : ''}
+                            </span>
+                          </div>
+
+                          {r.address && (
+                            <div className="text-sm text-gray-700 flex items-center gap-1">
+                              <MapPin size={14} className="text-gray-500" />
+                              <span>{r.address}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-shrink-0 self-center">
+                          <div className="size-7 grid place-items-center rounded-full bg-gray-100 text-gray-500 group-hover:bg-gray-200">
+                            <ChevronRight size={16} />
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </Wrapper>
+                  )}
                 </li>
               );
             })}

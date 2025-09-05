@@ -31,7 +31,7 @@ export default async function ChurchPage({
     'belief_type','denomination','trinitarian','extraction_confidence','church_summary','is_weekly_church','campus_name','overarching_name','is_multi_campus',
     'geojson'
   ].join(',')
-  const fallbackUrl = zuploUrl && id ? `${zuploUrl}/v1/churches/search?id=${id}&limit=1&fields=${encodeURIComponent(FALLBACK_FIELDS)}` : null
+  // const fallbackUrl = zuploUrl && id ? `${zuploUrl}/v1/churches/search?id=${id}&limit=1&fields=${encodeURIComponent(FALLBACK_FIELDS)}` : null
 
   if (!id) {
     return (
