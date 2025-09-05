@@ -430,8 +430,7 @@ export default function ExplorerClient() {
               if (startM != null || endM != null) {
                 times = times.filter((t) => inTimeRange(((t.minutes % 1440) + 1440) % 1440, startM, endM));
               }
-              const hasLink = Boolean(r.church_id)
-              // removed polymorphic Wrapper:any for lint compliance
+              // Link to profile when we have an id
               return (
                 <li key={`${r.church_id || 'no-id'}-${idx}`} className="rounded-lg border bg-white">
                   {r.church_id ? (
