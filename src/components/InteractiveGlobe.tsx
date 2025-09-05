@@ -106,13 +106,14 @@ export default function InteractiveGlobe() {
 
     let wheelHandler: ((e: WheelEvent) => void) | null = null;
     let prevEnableZoom: boolean | null = null;
+    let domEl: HTMLElement | null = null;
     if (isDesktop) {
       // Disable OrbitControls wheel zoom to avoid double handling
       prevEnableZoom = controls.enableZoom;
       controls.enableZoom = false;
 
       const renderer = (globe as unknown as { renderer?: () => THREE.WebGLRenderer }).renderer?.();
-      const domEl = renderer?.domElement || (containerRef.current as unknown as HTMLElement | null);
+      domEl = renderer?.domElement || (containerRef.current as unknown as HTMLElement | null);
 
       if (domEl) {
         wheelHandler = (e: WheelEvent) => {
@@ -155,10 +156,8 @@ export default function InteractiveGlobe() {
 
     return () => {
       controls.removeEventListener?.('start', stopOnStart);
-      if (wheelHandler) {
-        const renderer = (globe as unknown as { renderer?: () => THREE.WebGLRenderer }).renderer?.();
-        const domEl = renderer?.domElement || (containerRef.current as unknown as HTMLElement | null);
-        domEl?.removeEventListener('wheel', wheelHandler as EventListener);
+      if (wheelHandler && domEl) {
+        domEl.removeEventListener('wheel', wheelHandler as EventListener);
       }
       if (prevEnableZoom !== null) {
         controls.enableZoom = prevEnableZoom;

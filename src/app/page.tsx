@@ -52,7 +52,7 @@ export default function Page() {
       <section className="bg-white pt-3 pb-16 md:pt-0 md:pb-24">
         <div className="container mx-auto px-4">
           <p className="text-lg text-gray-700 max-w-3xl mx-auto text-center mb-12">
-            We're on a mission to create a digital ecosystem aligned with the Great Commission to connect believers from all the nations. We've built these capabilities for the global Church:
+            We&#39;re on a mission to create a digital ecosystem aligned with the Great Commission to connect believers from all the nations. We&#39;ve built these capabilities for the global Church:
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto px-4 md:px-6 lg:px-8">
             <FeatureCard

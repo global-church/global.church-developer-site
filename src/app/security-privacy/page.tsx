@@ -1,6 +1,6 @@
 // src/app/security-privacy/page.tsx
 
-import { ShieldCheck, KeyRound, Lock, DatabaseZap, Zap, GitPullRequest, RotateCw, Network } from "lucide-react";
+import { ShieldCheck, KeyRound, DatabaseZap, Zap, GitPullRequest, RotateCw } from "lucide-react";
 import ContentPage from "../../components/ContentPage";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Separator } from "../../components/ui/separator";
@@ -72,11 +72,11 @@ export default function SecurityPage() {
             </p>
             <h3 className="text-xl font-semibold text-card-foreground">Data We Handle</h3>
             <p>
-              The Global.Church API exclusively serves public information about church organizations, such as names, addresses, service times, and websites. We do not collect, store, or process any Personal Identifiable Information (PII) of our partners' end-users through our API.
+              The Global.Church API exclusively serves public information about church organizations, such as names, addresses, service times, and websites. We do not collect, store, or process any Personal Identifiable Information (PII) of our partners&#39; end-users through our API.
             </p>
             <h3 className="text-xl font-semibold text-card-foreground">Partner Information</h3>
             <p>
-              To provide and manage API access, we securely store the necessary contact and organizational information for our registered partners. This information is used solely for service administration, communication, and billing purposes. We do not sell or share our partners' information with third parties.
+              To provide and manage API access, we securely store the necessary contact and organizational information for our registered partners. This information is used solely for service administration, communication, and billing purposes. We do not sell or share our partners&#39; information with third parties.
             </p>
             <h3 className="text-xl font-semibold text-card-foreground">Website Data Collection</h3>
             <p>
