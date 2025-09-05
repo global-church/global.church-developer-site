@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import FeatureCard from "@/components/FeatureCard";
-import { FileText, Code, MapPin } from "lucide-react";
+import { FileText, Code, Lock } from "lucide-react";
 import GlobeLoader from "@/components/GlobeLoader";
 
 
@@ -21,7 +21,7 @@ export default function Page() {
             Uniting the Global Church,<br />one API at a time.
           </h1>
           <p className="mt-4 text-lg text-gray-600 max-w-3xl mx-auto mb-0">
-            We&#39;re building an open-source data schema and powerful APIs to help developers connect people with local churches.
+            We&#39;re building an open-source data schema and powerful APIs to help developers connect the global body of Christ.
           </p>
         </div>
 
@@ -35,27 +35,26 @@ export default function Page() {
         </div>
 
         {/* CTA buttons stay constrained under the globe */}
-        <div className="container mx-auto px-4 mt-16 md:mt-24 mb-24 md:mb-40">
-          <div className="mt-8 flex justify-center gap-4">
-            <Link href="/explorer" passHref>
-              <Button size="lg">Explore Churches</Button>
-            </Link>
-            <Link href="/schema" passHref>
-              <Button variant="outline" size="lg">View the Schema</Button>
-            </Link>
+        <div className="container mx-auto px-4 mt-16 md:mt-24 mb-0 md:mb-12 relative z-20">
+          <div className="mt-24 md:mt-28 flex justify-center gap-4">
+            <Button asChild size="lg">
+              <Link href="/explorer">Explore Churches</Link>
+            </Button>
+            <Button asChild variant="outline" size="lg">
+              <Link href="/schema">View the Schema</Link>
+            </Button>
           </div>
         </div>
 
       </section>
 
       {/* Features Section */}
-      <section className="bg-white py-16 md:py-24">
+      <section className="bg-white pt-3 pb-16 md:pt-0 md:pb-24">
         <div className="container mx-auto px-4">
           <p className="text-lg text-gray-700 max-w-3xl mx-auto text-center mb-12">
-            Global.Church is a mission-driven digital platform aligned with the Great Commission to reach all nations. Its focus is on catalyzing collaboration, discipleship, and action towards this mission and has set out to make the following capabilities available for the global Church:
+            We're on a mission to create a digital ecosystem aligned with the Great Commission to connect believers from all the nations. We've built these capabilities for the global Church:
           </p>
-          <h2 className="text-3xl font-bold text-center mb-12">A Platform for FaithTech Innovators</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto px-4 md:px-6 lg:px-8">
             <FeatureCard
               icon={<FileText size={24} />}
               title="Shared Schema"
@@ -64,17 +63,41 @@ export default function Page() {
             />
             <FeatureCard
               icon={<Code size={24} />}
-              title="Robust Church API"
-              description="Access a growing global database of church information through our developer-friendly GraphQL API."
+              title="Full-Featured API"
+              description="Access a growing global database of church information through our developer-friendly Zuplo API."
               href="/api-docs"
             />
-            <FeatureCard
-              icon={<MapPin size={24} />}
-              title="Live Church Explorer"
-              description="See the API in action with our Church Explorer tool, built on the very platform you can use."
-              href="/explorer"
-            />
           </div>
+          <div className="mt-4 md:mt-6 max-w-5xl mx-auto px-4 md:px-6 lg:px-8">
+            <div className="w-full">
+              <FeatureCard
+                icon={<Lock size={24} />}
+                title="Robust Security & Privacy"
+                description={
+                  <>
+                    With a secure API gateway providing a single point of entry,<br />
+                    security and privacy are always at the center of our work.
+                  </>
+                }
+                href="/security-privacy"
+                align="center"
+              />
+            </div>
+          </div>
+          <h2 className="text-3xl font-bold text-center pt-20 mb-0">
+            A Platform for FaithTech Innovators,<br />
+            by FaithTech Innovators
+          </h2>
+          <div className="container mx-auto px-4 mt-16 md:mt-24 mb-0 md:mb-12 relative z-20">
+          <div className="mt-24 md:mt-28 flex justify-center gap-4">
+            <Button asChild size="lg">
+              <Link href="/explorer">Learn More</Link>
+            </Button>
+            <Button asChild variant="outline" size="lg">
+              <Link href="/schema">Connect With Us</Link>
+            </Button>
+          </div>
+        </div>
         </div>
       </section>
     </div>

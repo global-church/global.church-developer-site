@@ -10,6 +10,13 @@ import * as THREE from 'three';
 import { Feature } from 'geojson';
 import { searchChurchesGeoJSON } from '@/lib/zuplo';
 
+// Globe zoom limits (altitude). Tweak these to adjust min/max zoom.
+const MIN_GLOBE_ALTITUDE = 1.7; // closer (zoomed in)
+const MAX_GLOBE_ALTITUDE = 3;   // farther (zoomed out)
+// Scroll zoom tuning
+const WHEEL_ZOOM_SENSITIVITY = 0.007; // higher = faster zoom per tick (default was 0.0015)
+const WHEEL_ZOOM_ANIM_MS = 120;        // shorter animation for snappier response (was 200)
+
 type ChurchPoint = {
   lat: number;
   lng: number;
@@ -77,8 +84,8 @@ export default function InteractiveGlobe() {
     const globe = globeRef.current;
     if (!globe) return;
 
-    // Center over Europe by default
-    globe.pointOfView({ lat: 50, lng: 10, altitude: 2.2 });
+    // Center over Europe by default at max altitude
+    globe.pointOfView({ lat: 50, lng: 10, altitude: MAX_GLOBE_ALTITUDE });
 
     const controls = globe.controls();
     controls.autoRotate = true;
@@ -92,6 +99,53 @@ export default function InteractiveGlobe() {
     const stopOnStart = () => { controls.autoRotate = false; };
     controls.addEventListener?.('start', stopOnStart);
 
+    // Desktop-only: reverse wheel zoom direction (scroll down zooms in)
+    const isDesktop = typeof window !== 'undefined'
+      && window.matchMedia?.('(pointer: fine)').matches
+      && !('ontouchstart' in window);
+
+    let wheelHandler: ((e: WheelEvent) => void) | null = null;
+    let prevEnableZoom: boolean | null = null;
+    if (isDesktop) {
+      // Disable OrbitControls wheel zoom to avoid double handling
+      prevEnableZoom = controls.enableZoom;
+      controls.enableZoom = false;
+
+      const renderer = (globe as unknown as { renderer?: () => THREE.WebGLRenderer }).renderer?.();
+      const domEl = renderer?.domElement || (containerRef.current as unknown as HTMLElement | null);
+
+      if (domEl) {
+        wheelHandler = (e: WheelEvent) => {
+          // Reverse: positive deltaY (scroll down) should zoom IN (decrease altitude)
+          const pov = (globe.pointOfView() as unknown as { lat: number; lng: number; altitude: number }) || { lat: 0, lng: 0, altitude: MAX_GLOBE_ALTITUDE };
+          const currentAlt = pov.altitude;
+
+          const delta = e.deltaY;
+          if (!Number.isFinite(delta) || delta === 0) return; // let it bubble
+
+          const scale = Math.exp(Math.abs(delta) * WHEEL_ZOOM_SENSITIVITY);
+
+          // If delta > 0 (scroll down) => zoom in => smaller altitude
+          const nextAlt = delta > 0 ? currentAlt / scale : currentAlt * scale;
+          const clamped = Math.max(MIN_GLOBE_ALTITUDE, Math.min(MAX_GLOBE_ALTITUDE, nextAlt));
+
+          // If clamped equals currentAltitude and user is pushing further in same direction, allow page scroll
+          const pushingIn = delta > 0; // towards MIN
+          const pushingOut = delta < 0; // towards MAX
+          const atMin = currentAlt <= MIN_GLOBE_ALTITUDE + 1e-4;
+          const atMax = currentAlt >= MAX_GLOBE_ALTITUDE - 1e-4;
+          if ((atMin && pushingIn) || (atMax && pushingOut) || clamped === currentAlt) {
+            return; // do not prevent default; let page handle scroll
+          }
+
+          e.preventDefault();
+          e.stopPropagation();
+          globe.pointOfView({ lat: pov.lat, lng: pov.lng, altitude: clamped }, WHEEL_ZOOM_ANIM_MS);
+        };
+        domEl.addEventListener('wheel', wheelHandler, { passive: false });
+      }
+    }
+
     let rafId = 0;
     const tick = () => {
       try { controls.update?.(); } catch { /* no-op */ }
@@ -101,6 +155,14 @@ export default function InteractiveGlobe() {
 
     return () => {
       controls.removeEventListener?.('start', stopOnStart);
+      if (wheelHandler) {
+        const renderer = (globe as unknown as { renderer?: () => THREE.WebGLRenderer }).renderer?.();
+        const domEl = renderer?.domElement || (containerRef.current as unknown as HTMLElement | null);
+        domEl?.removeEventListener('wheel', wheelHandler as EventListener);
+      }
+      if (prevEnableZoom !== null) {
+        controls.enableZoom = prevEnableZoom;
+      }
       cancelAnimationFrame(rafId);
     };
   }, [globeReady]);
@@ -109,22 +171,22 @@ export default function InteractiveGlobe() {
   const zoomToAltitude = (targetAlt: number) => {
     const globe = globeRef.current;
     if (!globe) return;
-    const pov = (globe.pointOfView() as unknown as { lat: number; lng: number; altitude: number }) || { lat: 0, lng: 0, altitude: 2.2 };
-    const next = { lat: pov.lat, lng: pov.lng, altitude: Math.max(0.4, Math.min(5, targetAlt)) };
+    const pov = (globe.pointOfView() as unknown as { lat: number; lng: number; altitude: number }) || { lat: 0, lng: 0, altitude: MAX_GLOBE_ALTITUDE };
+    const next = { lat: pov.lat, lng: pov.lng, altitude: Math.max(MIN_GLOBE_ALTITUDE, Math.min(MAX_GLOBE_ALTITUDE, targetAlt)) };
     globe.pointOfView(next, 600);
   };
 
   const handleZoomIn = () => {
     const globe = globeRef.current;
     if (!globe) return;
-    const pov = (globe.pointOfView() as unknown as { altitude: number }) || { altitude: 2.2 };
+    const pov = (globe.pointOfView() as unknown as { altitude: number }) || { altitude: MAX_GLOBE_ALTITUDE };
     zoomToAltitude(pov.altitude * 0.8);
   };
 
   const handleZoomOut = () => {
     const globe = globeRef.current;
     if (!globe) return;
-    const pov = (globe.pointOfView() as unknown as { altitude: number }) || { altitude: 2.2 };
+    const pov = (globe.pointOfView() as unknown as { altitude: number }) || { altitude: MAX_GLOBE_ALTITUDE };
     zoomToAltitude(pov.altitude * 1.25);
   };
 

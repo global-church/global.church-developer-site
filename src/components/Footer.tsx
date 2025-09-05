@@ -8,6 +8,7 @@ export default function Footer() {
           <Link href="/about">About</Link>
           <Link href="/faq">FAQs</Link>
           <Link href="/contact">Contact</Link>
+          <Link href="/security-privacy">Security & Privacy</Link>
         </div>
         <div>
           © {new Date().getFullYear()} Global.Church. All Rights Reserved.
@@ -16,5 +17,4 @@ export default function Footer() {
     </footer>
   );
 }
-
 
