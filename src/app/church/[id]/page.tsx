@@ -14,10 +14,13 @@ export const dynamic = 'force-dynamic'
 
 type ChurchWithOptionalRoot = ChurchPublic & { website_root?: string | null }
 
-export default async function ChurchPage({
-  params,
-}: { params: { id: string } } | { params: Promise<{ id: string }> }) {
-  const p = (params as Promise<{ id: string }>)?.then ? await (params as Promise<{ id: string }>) : (params as { id: string })
+// Accept Next's PageProps (which may wrap params as a Promise in some modes)
+type ParamsMaybePromise = { params: { id: string } } | { params: Promise<{ id: string }> }
+
+export default async function ChurchPage(input: ParamsMaybePromise) {
+  const p = 'then' in (input as { params: Promise<{ id: string }> }).params
+    ? await (input as { params: Promise<{ id: string }> }).params
+    : (input as { params: { id: string } }).params
   const id = p?.id
   const zuploUrl = process.env.NEXT_PUBLIC_ZUPLO_API_URL || null
   const zuploKey = process.env.NEXT_PUBLIC_ZUPLO_API_KEY || null
