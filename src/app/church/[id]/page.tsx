@@ -15,7 +15,10 @@ export const dynamic = 'force-dynamic'
 type ChurchWithOptionalRoot = ChurchPublic & { website_root?: string | null }
 
 // Accept Next's PageProps (which may wrap params as a Promise in some modes)
-export default async function ChurchPage(input: any) {
+// Next.js App Router Page props with `params` that may be a Promise in some modes
+type PageProps = { params: { id: string } | Promise<{ id: string }> }
+
+export default async function ChurchPage(input: PageProps) {
   const raw = input?.params
   const p = raw?.then ? await raw : raw
   const id = p?.id
