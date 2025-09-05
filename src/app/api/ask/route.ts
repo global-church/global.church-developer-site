@@ -14,9 +14,10 @@ type ChatTurn = { role: 'user' | 'assistant'; content: string };
 
 export async function POST(req: NextRequest) {
   try {
-    const { question, history } = (await req.json()) as {
+    const { question, history, previousResponseId } = (await req.json()) as {
       question?: unknown;
       history?: unknown;
+      previousResponseId?: unknown;
     };
     const parsedHistory: ChatTurn[] = Array.isArray(history)
       ? (history as unknown[])
@@ -67,9 +68,7 @@ export async function POST(req: NextRequest) {
         { status: 500 },
       );
     }
-    const serverUrl = `${mcpUrl}?apiKey=${mcpApiKey}`;
-
-    const promptInput = `${q}\n\nIf a filter (belief, languages, programs, q) is not provided, omit it.`;
+    const serverUrl = mcpUrl;
 
     const openaiRes = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -78,23 +77,29 @@ export async function POST(req: NextRequest) {
         authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'gpt-5',
+        model: 'gpt-5-mini-2025-08-07',
         // Keep developer instructions via prompt id
         prompt: {
           id: 'pmpt_68ba191fff508193a1b2d77008a32fa401db62f89e66a7a6',
-          version: '3',
+          version: '4',
         },
+        previous_response_id: typeof previousResponseId === 'string' ? previousResponseId : undefined,
         // Supply chat history as messages so the model has context
         input: [
-          ...safeHistory.map((t) => ({ role: t.role, content: [{ type: 'input_text', text: t.content }] })),
-          // Ensure the latest user input is included even if the client didn't send it in history
-          ...(safeHistory.length === 0 || safeHistory[safeHistory.length - 1]?.content !== promptInput
-            ? [{ role: 'user' as const, content: [{ type: 'input_text', text: promptInput }] }]
-            : []),
+          ...safeHistory.map((t) => ({
+            role: t.role,
+            content: [
+              { type: (t.role === 'assistant' ? 'output_text' : 'input_text'), text: t.content },
+            ],
+          })),
+          { role: 'user', content: [{ type: 'input_text', text: q }] },
         ],
-        text: { format: { type: 'text' } },
+        reasoning: { effort: 'low' },
+        text: { format: { type: 'text' }, verbosity: 'low' },
+        max_output_tokens: 3000,
         store: false,
         tool_choice: 'auto',
+        parallel_tool_calls: false,
         tools: [
           {
             type: 'mcp',
@@ -102,6 +107,9 @@ export async function POST(req: NextRequest) {
             server_url: serverUrl,
             allowed_tools: ['churches_search_v1'],
             require_approval: 'never',
+            headers: {
+              Authorization: `Bearer ${mcpApiKey}`,
+            },
           },
         ],
       }),
@@ -233,7 +241,7 @@ export async function POST(req: NextRequest) {
       }),
     );
 
-    return NextResponse.json({ message, query: queryParams, raw });
+    return NextResponse.json({ message, query: queryParams, raw, responseId: data.id });
   } catch (err) {
     console.error('ask route error', err);
     return NextResponse.json(

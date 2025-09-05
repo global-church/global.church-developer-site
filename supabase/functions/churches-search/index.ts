@@ -1,6 +1,6 @@
 // supabase/functions/churches-search/index.ts
 // VERY IMPORTANT: THIS IS FOR REFERENCE ONLY. The actual implementation of this edge function is in Supabase.
-// Last synced: 2025-09-02
+// Last synced: 2025-09-05
 // This edge function routes to the correct RPC based on query params.
 
 
@@ -63,6 +63,20 @@ const supabase = createClient(supabaseUrl, serviceKey, {
   // The radius RPC also returns "distance_m"; include it here for projection if present.
   "distance_m"
 ]);
+/** Default lean projection for list/search (exclude church_id; include key links). */
+const DEFAULT_FIELDS = [
+  "name",
+  "address",
+  "locality",
+  "region",
+  "country",
+  "website",
+  "url_beliefs",
+  "url_giving",
+  "url_live",
+  "latitude",
+  "longitude",
+] as const;
 /** Small helpers */ const pick = (obj, keys)=>{
   const out = {};
   for (const k of keys)if (k in obj) out[k] = obj[k];
@@ -126,14 +140,14 @@ serve(async (req)=>{
     const q = qp.get("q") ?? qp.get("church_name") ?? null;
     const p_country = qp.get("country");
     const p_belief = qp.get("belief");
-    const p_trinit = parseBool(qp, "trinitarian");
+    const p_trinit = parseBool(qp, "trinitarian"); // NOTE: `trinitarian` doesn't add value to the search since all records are true.
     const p_region = qp.get("region");
     const p_locality = qp.get("locality");
     const p_postal_code = qp.get("postal_code");
     const equals_id = qp.get("id");
     const limitRaw = parseNum(qp, "limit");
-    // Be generous for internal/indexing jobs, but clamp absurd values
-    const p_limit = Math.max(1, Math.min(limitRaw ?? 25, 300000));
+    // Align with OpenAPI (max 100). Keep 25 as default.
+    const p_limit = Math.max(1, Math.min(limitRaw ?? 25, 100));
     // Multi-select
     const p_languages = parseList(qp, "languages");
     const p_programs = parseList(qp, "programs");
@@ -161,7 +175,17 @@ serve(async (req)=>{
     ].every((v)=>v !== null);
     // Response shaping
     const fieldsParam = qp.get("fields"); // e.g., fields=name,latitude,longitude,website
-    const fields = fieldsParam ? fieldsParam.split(",").map((s)=>s.trim()).filter((s)=>V1_COLUMNS.has(s)) : null;
+    let fields: string[] | null = null;
+    if (fieldsParam && fieldsParam.trim().length) {
+      fields = fieldsParam
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => V1_COLUMNS.has(s));
+      if (fields.length === 0) fields = null; // fall back if nothing valid
+    } else {
+      // No explicit projection requested: return a lean, helpful set with key links
+      fields = [...DEFAULT_FIELDS];
+    }
     const format = (qp.get("format") || "json").toLowerCase(); // "json" | "geojson"
     const forGlobe = parseBool(qp, "for_globe") === true;
     let functionName;
@@ -225,7 +249,10 @@ serve(async (req)=>{
       items = items.filter((r)=>Array.isArray(r?.ministry_names) ? r.ministry_names?.some((v)=>v?.toLowerCase().includes(p_program.toLowerCase())) : true);
     }
     if (fields?.length) {
-      items = items.map((row)=>pick(row, fields));
+      // Ensure GeoJSON has coordinates even if caller omitted them
+      const needCoords = format === "geojson" && (!fields.includes("latitude") || !fields.includes("longitude"));
+      const projFields = needCoords ? Array.from(new Set([...fields, "latitude", "longitude"])) : fields;
+      items = items.map((row) => pick(row, projFields));
     }
     if (format === "geojson") {
       return json(toGeoJSON(items, fields ?? undefined), 200);
