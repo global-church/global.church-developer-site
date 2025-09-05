@@ -516,7 +516,7 @@ export default function LeafletMapInner({
 				)}
 				{clusterIndex && bounds && (
 					<>
-						{clusterIndex.getClusters([bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1]], Math.round(zoomLevel)).map((c) => {
+						{clusterIndex.getClusters([bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1]], Math.round(zoomLevel)).map((c, idx) => {
 							const feat = c as GeoJSON.Feature<GeoJSON.Point>
 							const [lng, lat] = feat.geometry.coordinates
 							const props = (c as unknown as { properties: Record<string, unknown> }).properties
@@ -525,13 +525,13 @@ export default function LeafletMapInner({
 								const count = cf.properties.point_count
 								const cid = (c as unknown as { id: number }).id
 								return (
-									<ClusterMarker key={`cluster-${String(cid)}`} lat={lat} lng={lng} id={cid} count={count} index={clusterIndex} zoomLevel={zoomLevel} />
+									<ClusterMarker key={`cluster-${String(cid)}-${idx}`} lat={lat} lng={lng} id={cid} count={count} index={clusterIndex} zoomLevel={zoomLevel} />
 								)
 							}
 							const fp = c as unknown as FeaturePoint
 							const p = fp.properties.point
 							return (
-								<Marker key={p.church_id} position={[lat, lng]} icon={blackPinIcon}>
+								<Marker key={`p-${p.church_id || 'no-id'}-${idx}`} position={[lat, lng]} icon={blackPinIcon}>
 									<Popup className="min-w-64">
 										<div className="space-y-3 p-2">
 											<div className="font-semibold text-gray-900 text-base">{p.name}</div>
@@ -555,7 +555,9 @@ export default function LeafletMapInner({
                                                                                           )
                                                                                         })()}
 											<div className="flex gap-2 text-sm">
-												<Link className="text-green-600 hover:text-green-700 font-medium" href={`/church/${p.church_id}`}>View Details</Link>
+												{p.church_id && (
+													<Link className="text-green-600 hover:text-green-700 font-medium" href={`/church/${p.church_id}`}>View Details</Link>
+												)}
 												{p.website && (<><span className="text-gray-300">•</span><a className="text-blue-600 hover:text-blue-700" href={p.website} target="_blank" rel="noopener noreferrer">Website</a></>)}
 											</div>
 										</div>

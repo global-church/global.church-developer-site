@@ -63,8 +63,9 @@ const supabase = createClient(supabaseUrl, serviceKey, {
   // The radius RPC also returns "distance_m"; include it here for projection if present.
   "distance_m"
 ]);
-/** Default lean projection for list/search (exclude church_id; include key links). */
+/** Default lean projection for list/search – MUST include church_id for linking. */
 const DEFAULT_FIELDS = [
+  "church_id",
   "name",
   "address",
   "locality",
@@ -181,6 +182,7 @@ serve(async (req)=>{
         .split(",")
         .map((s) => s.trim())
         .filter((s) => V1_COLUMNS.has(s));
+      if (!fields.includes("church_id")) fields.push("church_id");
       if (fields.length === 0) fields = null; // fall back if nothing valid
     } else {
       // No explicit projection requested: return a lean, helpful set with key links

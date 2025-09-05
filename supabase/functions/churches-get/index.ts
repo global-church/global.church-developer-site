@@ -52,11 +52,11 @@ serve(async (req)=>{
         error: "Invalid id: must be a UUID"
       }, 400);
     }
-    // Query the api schema view directly; return the full ChurchV1 record.
-    // Supabase JS supports per-query schema selection via .schema('api').from(...).select()
-    // Ref: Supabase docs on select() and schema(): 
-    // https://supabase.com/docs/reference/javascript/select
-    const { data, error } = await supabase.schema("api").from("v1_churches").select("*").eq("church_id", id).limit(1).single();
+    // Prefer SECURITY DEFINER RPC to avoid permission issues when service role key is absent
+    // Equivalent to: SELECT * FROM api.v1_churches WHERE church_id = :id LIMIT 1
+    const { data, error } = await supabase
+      .schema("api")
+      .rpc("search_churches", { equals_id: id, p_limit: 1 });
     if (error) {
       // Differentiate not found vs other errors where possible
       // (supabase-js sets error.code === 'PGRST116' sometimes for no rows; .single() normalizes though)
@@ -64,13 +64,14 @@ serve(async (req)=>{
         error: error.message
       }, 400);
     }
-    if (!data) {
+    const row = Array.isArray(data) ? (data[0] || null) : (data || null)
+    if (!row) {
       return json({
         error: "Not found"
       }, 404);
     }
     // ✅ Always return the full record
-    return json(data, 200);
+    return json(row, 200);
   } catch (e) {
     console.error("churches-get error:", e);
     return json({

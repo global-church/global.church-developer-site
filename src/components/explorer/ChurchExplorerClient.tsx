@@ -417,7 +417,7 @@ export default function ExplorerClient() {
           )}
 
           <ul className="space-y-3">
-            {resultsFiltered.map((r) => {
+            {resultsFiltered.map((r, idx) => {
               const languages = Array.isArray(r.service_languages) ? r.service_languages : [];
               const languageNames = formatLanguages(languages);
               const beliefPretty = formatBelief(r.belief_type ?? null);
@@ -430,9 +430,12 @@ export default function ExplorerClient() {
               if (startM != null || endM != null) {
                 times = times.filter((t) => inTimeRange(((t.minutes % 1440) + 1440) % 1440, startM, endM));
               }
+              const hasLink = Boolean(r.church_id)
+              const Wrapper: any = hasLink ? 'a' : 'div'
+              const wrapperProps = hasLink ? { href: `/church/${r.church_id}` } : {}
               return (
-                <li key={r.church_id} className="rounded-lg border bg-white">
-                  <a href={`/church/${r.church_id}`} className="block p-4 group">
+                <li key={`${r.church_id || 'no-id'}-${idx}`} className="rounded-lg border bg-white">
+                  <Wrapper {...wrapperProps} className="block p-4 group">
                     <div className="flex items-start gap-3">
                       <div className="size-12 rounded-full bg-primary grid place-items-center text-lg font-semibold text-white flex-shrink-0">
                         {r.name?.charAt(0).toUpperCase() ?? "C"}
@@ -490,7 +493,7 @@ export default function ExplorerClient() {
                         </div>
                       </div>
                     </div>
-                  </a>
+                  </Wrapper>
                 </li>
               );
             })}

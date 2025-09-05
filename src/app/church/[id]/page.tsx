@@ -1,11 +1,11 @@
 // src/app/church/[id]/page.tsx
-import { searchChurches } from "@/lib/zuplo"
+import { getChurchById, searchChurches } from "@/lib/zuplo"
 import { ChurchPublic } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import YouTubeLatest from "@/components/YouTubeLatest"
 import { getFacebookPageUrl } from "@/lib/facebook"
 import FacebookSection from "@/components/FacebookSection"
-import { getChannelIdFromAnyYouTubeUrl } from "@/lib/resolveChannelId"
+// YouTube URL is now sourced only from url_youtube; no pre-validation needed
 import { formatLanguages } from "@/lib/languages"
 import { ArrowLeft, MoreVertical, MapPin, Instagram, Youtube, Mail, ExternalLink, Phone, Facebook } from "lucide-react"
 import Link from "next/link"
@@ -16,10 +16,63 @@ type ChurchWithOptionalRoot = ChurchPublic & { website_root?: string | null }
 
 export default async function ChurchPage({
   params,
-}: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const churches = await searchChurches({ id: id, limit: 1 })
-  const data = churches[0] || null
+}: { params: { id: string } }) {
+  const id = params?.id
+  const zuploUrl = process.env.NEXT_PUBLIC_ZUPLO_API_URL || null
+  const zuploKey = process.env.NEXT_PUBLIC_ZUPLO_API_KEY || null
+  const zHost = (() => { try { return zuploUrl ? new URL(zuploUrl).host : null } catch { return null } })()
+  const attemptedUrl = zuploUrl && id ? `${zuploUrl}/v1/churches/${id}` : null
+  const looksUuid = typeof id === 'string' ? /^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.test(id) : false
+  const nowIso = new Date().toISOString()
+  const FALLBACK_FIELDS = [
+    'church_id','gers_id','name','pipeline_status','latitude','longitude','address','locality','region','postal_code','country',
+    'website','phone','url_giving','url_beliefs','url_youtube','url_facebook','url_instagram','url_tiktok','url_campus','url_live',
+    'contact_emails','contact_phones','service_times','service_languages','service_source_urls','ministry_names','ministries_json',
+    'belief_type','denomination','trinitarian','extraction_confidence','church_summary','is_weekly_church','campus_name','overarching_name','is_multi_campus',
+    'geojson'
+  ].join(',')
+  const fallbackUrl = zuploUrl && id ? `${zuploUrl}/v1/churches/search?id=${id}&limit=1&fields=${encodeURIComponent(FALLBACK_FIELDS)}` : null
+
+  if (!id) {
+    return (
+      <div className="min-h-screen bg-gray-50 pb-32">
+        <div className="bg-white px-4 py-4 border-b border-gray-200">
+          <div className="flex items-center gap-3 mb-2">
+            <Link href="/explorer" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <ArrowLeft size={20} />
+            </Link>
+            <h1 className="text-xl font-semibold text-gray-900">Church</h1>
+          </div>
+        </div>
+        <div className="px-4 py-12 text-center text-gray-600">
+          <div className="mb-2">Church not found.</div>
+          <div className="text-xs text-left inline-block bg-gray-100 text-gray-700 rounded-md p-3">
+            <div><strong>Diagnostics</strong></div>
+            <div>time: {nowIso}</div>
+            <div>param.id: (missing)</div>
+            <div>zuplo.host: {zHost ?? '(unset)'}</div>
+            <div>zuplo.url: {zuploUrl ?? '(unset)'} </div>
+            <div>api.key: {zuploKey ? `set (len=${String(zuploKey).length})` : 'unset'}</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+  let data: ChurchWithOptionalRoot | null = null
+  let fetchError: string | null = null
+  let source: 'by-id' | 'fallback-search' | 'none' = 'none'
+  try {
+    data = (await getChurchById(id)) as ChurchWithOptionalRoot | null
+    source = data ? 'by-id' : 'none'
+  } catch (e) {
+    fetchError = e instanceof Error ? e.message : String(e)
+    // Fallback to legacy search route for resilience while debugging gateway
+    try {
+      const rows = await searchChurches({ id, limit: 1, fields: FALLBACK_FIELDS })
+      data = (rows?.[0] as ChurchWithOptionalRoot) || null
+      if (data) source = 'fallback-search'
+    } catch {}
+  }
 
   if (!data) {
     // Graceful empty state rather than a 404 so users can recover
@@ -33,7 +86,22 @@ export default async function ChurchPage({
             <h1 className="text-xl font-semibold text-gray-900">Church</h1>
           </div>
         </div>
-        <div className="px-4 py-12 text-center text-gray-600">Church not found.</div>
+        <div className="px-4 py-12 text-center text-gray-600">
+          <div className="mb-2">Church not found.</div>
+          <div className="text-xs text-left inline-block bg-gray-100 text-gray-700 rounded-md p-3">
+            <div><strong>Diagnostics</strong></div>
+            <div>time: {nowIso}</div>
+            <div>param.id: <code>{id}</code></div>
+            <div>id.isUuid: {String(looksUuid)}</div>
+            <div>zuplo.host: {zHost ?? '(unset)'}</div>
+            <div>zuplo.url: {zuploUrl ?? '(unset)'} </div>
+            <div>endpoint: {attemptedUrl ?? '(n/a)'}</div>
+            <div>api.key: {zuploKey ? `set (len=${String(zuploKey).length})` : 'unset'}</div>
+            {fetchError && (
+              <div className="mt-1">error: <code>{fetchError}</code></div>
+            )}
+          </div>
+        </div>
       </div>
     )
   }
@@ -93,10 +161,8 @@ export default async function ChurchPage({
     return null
   })()
 
-  // Validate YouTube URL upfront to hide the section for 404/invalid links
-  const hasValidYouTube = church.youtube_url
-    ? Boolean(await getChannelIdFromAnyYouTubeUrl(church.youtube_url))
-    : false
+  // YouTube: prefer new url_youtube only
+  const youTubeUrl = (church as unknown as { url_youtube?: string | null }).url_youtube ?? null
 
   // Build Google Maps Embed URL (prefer geojson, then lat/lng, then address)
   const mapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_API_KEY
@@ -120,54 +186,30 @@ export default async function ChurchPage({
   // Extract Facebook Page URL server-side to keep client lean
   const fbUrl = getFacebookPageUrl(church.social_media) || church.url_facebook || null
 
-  // Parse services_info JSON string into structured lines (robust regex)
+  // Build service lines only from numeric service_times
   const serviceLines = (() => {
-    const raw = church.services_info
-    if (!raw) return [] as { language: string; day: string; time: string; description: string }[]
-
-    let items: string[] = []
-    try {
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed)) items = parsed as string[]
-      else if (typeof parsed === 'string') items = [parsed]
-    } catch {
-      items = String(raw).split(/\n|;|\|/).map((s) => s.trim()).filter(Boolean)
+    const times = Array.isArray(church.service_times) ? church.service_times.filter((n): n is number => Number.isFinite(n as number)) : []
+    if (times.length === 0) return [] as { language: string; day: string; time: string; description: string }[]
+    const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'] as const
+    const minutesToDayIndex = (m: number) => Math.max(0, Math.min(6, Math.floor(m / 1440)))
+    const minutesToTimeString = (m: number) => {
+      const mins = ((m % 1440) + 1440) % 1440
+      const hh = Math.floor(mins / 60)
+      const mm = mins % 60
+      const h12 = ((hh + 11) % 12) + 1
+      const ampm = hh >= 12 ? 'PM' : 'AM'
+      return `${h12}:${mm.toString().padStart(2,'0')} ${ampm}`
     }
-
-    const dayMap: Record<string, string> = {
-      Sun: 'Sundays', Mon: 'Mondays', Tue: 'Tuesdays', Tues: 'Tuesdays', Wed: 'Wednesdays', Thu: 'Thursdays', Thurs: 'Thursdays', Fri: 'Fridays', Sat: 'Saturdays',
-    }
-
-    const re = /^\s*([^:]+):\s*([A-Za-z]+)\s+(\d{1,2}:\d{2}\s*(?:AM|PM))\s*(?:\(([^)]+)\))?\s*$/i
-
-    return items.map((item) => {
-      let language = ''
-      let day = ''
-      let time = ''
-      let description = 'Service'
-
-      const m = item.match(re)
-      if (m) {
-        language = (m[1] || '').trim()
-        const dayAbbrev = (m[2] || '').trim()
-        day = dayMap[dayAbbrev] || dayAbbrev
-        time = (m[3] || '').trim()
-        description = (m[4] || 'Service').trim()
-      } else {
-        // Fallback: previous loose parsing
-        const [langPart, restRaw] = item.split(':', 2)
-        language = (langPart || '').trim()
-        const descMatch = restRaw?.match(/\(([^)]+)\)/)
-        description = (descMatch?.[1] || 'Service').trim()
-        const rest = (restRaw || '').replace(/\([^)]*\)/, '').trim()
-        const tokens = rest.split(/\s+/).filter(Boolean)
-        const dayAbbrev = tokens.shift() || ''
-        day = dayMap[dayAbbrev] || dayAbbrev
-        time = tokens.join(' ').trim()
-      }
-
-      return { language, day, time, description }
-    })
+    // Use pre-formatted language names (full names) if a single language is present
+    const defaultLang = (languageNames.length === 1 ? languageNames[0] : '')
+    return times
+      .map((n) => ({
+        language: defaultLang,
+        day: DAY_NAMES[minutesToDayIndex(n)],
+        time: minutesToTimeString(n),
+        description: 'Service',
+      }))
+      .sort((a, b) => a.day.localeCompare(b.day) || a.time.localeCompare(b.time))
   })()
 
   // Compute non-empty Programs list for conditional rendering
@@ -176,6 +218,8 @@ export default async function ChurchPage({
         .map((program) => String(program).trim())
         .filter((program) => program.length > 0)
     : []
+
+  const serviceLinesMain = serviceLines
 
   // Ministries: prefer structured objects from ministries_json (name + source_url).
   // Fallback to ministry_names as plain labels when no URLs are available.
@@ -225,7 +269,7 @@ export default async function ChurchPage({
   const hasConnect: boolean = Boolean(
     church.url_instagram || church.instagram_url ||
     fbUrl ||
-    hasValidYouTube ||
+    youTubeUrl ||
     contactEmails.length > 0 ||
     (preferredPhone && telHref) ||
     givingHref ||
@@ -288,9 +332,10 @@ export default async function ChurchPage({
               {church.belief_type.replace("_", " ")}
             </Badge>
           )}
-          {church.trinitarian_beliefs && (
-            <Badge variant="outline">Trinitarian</Badge>
-          )}
+          {(() => {
+            const isTrinitarian = (church as unknown as { trinitarian?: boolean | null }).trinitarian ?? church.trinitarian_beliefs
+            return isTrinitarian ? (<Badge variant="outline">Trinitarian</Badge>) : null
+          })()}
         </div>
         {church.denomination && (
           <div className="mt-2 text-center">
@@ -301,11 +346,11 @@ export default async function ChurchPage({
 
       {/* Details */}
       <div className="px-4 py-2 space-y-4">
-        {serviceLines.length > 0 && (
+        {serviceLinesMain.length > 0 && (
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <h3 className="text-sm font-medium text-gray-700 mb-3 text-center">Services</h3>
             <div className="space-y-2">
-              {serviceLines.slice(0, 10).map((s, idx) => (
+              {serviceLinesMain.slice(0, 10).map((s, idx) => (
                 <div key={`${s.language}-${s.day}-${s.time}-${idx}`} className="text-center text-gray-800">
                   <span className="font-medium">{s.description}</span>
                   {s.day && s.time && (
@@ -390,9 +435,9 @@ export default async function ChurchPage({
                   <Facebook size={18} />
                 </a>
               )}
-              {hasValidYouTube && (
+              {youTubeUrl && (
                 <a
-                  href={church.youtube_url as string}
+                  href={youTubeUrl as string}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="YouTube"
@@ -448,8 +493,8 @@ export default async function ChurchPage({
         {/* Contact Emails section removed per requirements */}
 
         {/* YouTube section renders itself (includes wrapper + heading) and hides on 404/invalid */}
-        {church.youtube_url && (
-          <YouTubeLatest youtubeUrl={church.youtube_url as string} max={6} wrap title="YouTube" />
+        {youTubeUrl && (
+          <YouTubeLatest youtubeUrl={youTubeUrl as string} max={6} wrap title="YouTube" />
         )}
 
         {/* Facebook (below YouTube) - temporarily always shown */}
@@ -515,6 +560,31 @@ export default async function ChurchPage({
             </div>
           )
         })()}
+
+        {/* API Developer Info (expandable) */}
+        <div className="mt-6 text-xs text-gray-700">
+          <details className="bg-gray-100 rounded-md p-3">
+            <summary className="cursor-pointer font-semibold">API Developer Info</summary>
+            <div className="mt-2 space-y-1">
+              <div>source: {source}</div>
+              <div>byId: {attemptedUrl ?? '(n/a)'} </div>
+              {/* <div>fallback: <span className="break-all">{fallbackUrl ?? '(n/a)'}</span></div> */}
+              <div>
+                projection: {source === 'by-id' ? (
+                  <span>full record (security-definer RPC)</span>
+                ) : (
+                  <>
+                    <span>fields param sent to search:</span>
+                    <pre className="whitespace-pre-wrap break-words bg-white/70 rounded p-2 mt-1">{FALLBACK_FIELDS}</pre>
+                  </>
+                )}
+              </div>
+              {fetchError && (
+                <div className="mt-1">error: <code>{fetchError}</code></div>
+              )}
+            </div>
+          </details>
+        </div>
       </div>
 
       {/* Action Buttons hidden */}

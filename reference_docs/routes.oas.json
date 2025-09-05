@@ -1,0 +1,448 @@
+// This is for reference only. The actual implementation is in Zuplo / globalchurch-api-gateway repo.
+
+// Last synced: 2025-09-05
+
+
+{
+    "openapi": "3.1.0",
+    "info": {
+      "version": "1.0.0",
+      "title": "Global.Church Church API"
+    },
+    "paths": {
+      "/v1/churches/search": {
+        "get": {
+          "summary": "Search churches (V1)",
+          "description": "Proxies to the Supabase Edge Function `churches-search`. Supports free-text, exact filters, viewport (bbox) and radius queries, arrays for languages/programs, optional field projection, and GeoJSON output. Last updated: 2025-09-04.",
+          "parameters": [
+            {
+              "in": "query",
+              "name": "q",
+              "description": "Free-text search across name/address/website (ranked). Only include this field if the user has explicitly requested it",
+              "schema": { "type": "string" },
+              "example": "grace church"
+            },
+            {
+              "in": "query",
+              "name": "country",
+              "description": "Country code (ISO 3166-1 alpha-3). Example: USA, NGA, GBR.",
+              "schema": { "type": "string", "minLength": 3, "maxLength": 3 },
+              "example": "USA"
+            },
+            {
+              "in": "query",
+              "name": "belief",
+              "description": "Top-level belief family. AGENT INSTRUCTION:Only include this field if the user has explicitly requested it.",
+              "schema": {
+                "type": "string",
+                "enum": ["roman_catholic", "protestant", "orthodox", "anglican", "other", "unknown"]
+              },
+              "example": "roman_catholic"
+            },
+            {
+              "in": "query",
+              "name": "trinitarian",
+              "description": "Filter by Trinitarian belief. Currently redundant since we only support Trinitarian churches. AGENT INSTRUCTION: Never include this field.",
+              "schema": { "type": "boolean" },
+              "example": true,
+              "deprecated": true
+            },
+            {
+              "in": "query",
+              "name": "region",
+              "description": "State/province/region code (e.g., US state). Most non-US regions are not supported. Use with caution. AGENT INSTRUCTION: You should almost never include this field.",
+              "schema": { "type": "string", "minLength": 2, "maxLength": 32 },
+              "example": "CA"
+            },
+            {
+              "in": "query",
+              "name": "locality",
+              "description": "City/locality/town name.",
+              "schema": { "type": "string" },
+              "example": "El Cajon"
+            },
+            {
+              "in": "query",
+              "name": "postal_code",
+              "description": "Postal/ZIP code prefix (prefix match).",
+              "schema": { "type": "string" },
+              "example": "92020"
+            },
+            {
+              "in": "query",
+              "name": "languages",
+              "description": "Service languages (array) using ISO 639-3 language codes. Encoded as repeated keys (e.g., ?languages=eng&languages=spa). Only include this parameter if the user has explicitly requested it.",
+              "schema": {
+                "type": "array",
+                "items": { "type": "string" },
+                "minItems": 1
+              },
+              "style": "form",
+              "explode": true,
+              "examples": {
+                "english_and_spanish": { "value": ["eng","spa"] },
+                "norwegian": { "value": ["nor"] }
+              }
+            },
+            {
+              "in": "query",
+              "name": "programs",
+              "description": "Programs/ministries offered (array). Partial/ILIKE match per token. Only include this parameter if the user has explicitly requested it.",
+              "schema": {
+                "type": "array",
+                "items": { "type": "string" },
+                "minItems": 1
+              },
+              "style": "form",
+              "explode": true,
+              "examples": {
+                "example_1": { "value": ["kids ministry","missions","youth ministry"] },
+                "example_2": { "value": ["christian women's council","music department","prayer ministry","young women's christian council","youth department"] }
+              }
+            },
+            {
+              "in": "query",
+              "name": "limit",
+              "description": "Max results to return. AGENT INSTRUCTION: Default 100.",
+              "schema": { "type": "integer", "minimum": 1, "maximum": 100 },
+              "example": 100
+            },
+            {
+              "in": "query",
+              "name": "id",
+              "description": "Filter by Global.Church's church_id field. UUIDv5 format. AGENT INSTRUCTION: You should almost never include this parameter.",
+              "schema": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+              },
+              "example": "9e1c2a7d-4c33-4b8b-9d7a-1a2b3c4d5e6f"
+            },
+            {
+              "in": "query",
+              "name": "min_lat",
+              "description": "Minimum latitude in decimal degrees.",
+              "schema": { "type": "number", "minimum": -90, "maximum": 90 },
+              "example": 32.5
+            },
+            {
+              "in": "query",
+              "name": "max_lat",
+              "description": "Maximum latitude in decimal degrees.",
+              "schema": { "type": "number", "minimum": -90, "maximum": 90 },
+              "example": 33.4
+            },
+            {
+              "in": "query",
+              "name": "min_lng",
+              "description": "Minimum longitude in decimal degrees.",
+              "schema": { "type": "number", "minimum": -180, "maximum": 180 },
+              "example": -117.5
+            },
+            {
+              "in": "query",
+              "name": "max_lng",
+              "description": "Maximum longitude in decimal degrees.",
+              "schema": { "type": "number", "minimum": -180, "maximum": 180 },
+              "example": -116.8
+            },
+            {
+              "in": "query",
+              "name": "center_lat",
+              "description": "Center latitude in decimal degrees.",
+              "schema": { "type": "number", "minimum": -90, "maximum": 90 },
+              "example": 32.7157
+            },
+            {
+              "in": "query",
+              "name": "center_lng",
+              "description": "Center longitude in decimal degrees.",
+              "schema": { "type": "number", "minimum": -180, "maximum": 180 },
+              "example": -117.1611
+            },
+            {
+              "in": "query",
+              "name": "radius_km",
+              "description": "Search radius in kilometers.",
+              "schema": { "type": "number", "minimum": 0.1, "maximum": 200 },
+              "example": 25
+            },
+            {
+              "in": "query",
+              "name": "fields",
+              "description": "Comma-separated list of columns to include. Columns map to api.v1_churches.",
+              "schema": { "type": "string" },
+              "example": "name,locality,country"
+            },
+            {
+              "in": "query",
+              "name": "format",
+              "description": "Response format. `json` returns { items: [...] }. `geojson` returns a FeatureCollection.",
+              "schema": { "type": "string", "enum": ["json","geojson"] },
+              "example": "json"
+            }
+          ],
+          "x-examples": {
+            "el_cajon_catholic": {
+              "summary": "Roman Catholic churches in El Cajon, CA",
+              "value": {
+                "queryParams": {
+                  "country": "USA",
+                  "belief": "roman_catholic",
+                  "locality": "El Cajon",
+                  "fields": "name,locality,country,belief_type"
+                }
+              }
+            },
+            "radius_downtown_sd_geojson": {
+              "summary": "Radius search near downtown San Diego (GeoJSON for maps)",
+              "value": {
+                "queryParams": {
+                  "center_lat": 32.7157,
+                  "center_lng": -117.1611,
+                  "radius_km": 10,
+                  "fields": "name,latitude,longitude",
+                  "format": "geojson"
+                }
+              }
+            },
+            "bbox_multi_filters": {
+              "summary": "Viewport search with language/program arrays",
+              "value": {
+                "queryParams": {
+                  "min_lat": 32.5,
+                  "max_lat": 33.5,
+                  "min_lng": -117.5,
+                  "max_lng": -116.5,
+                  "languages": ["eng","spa"],
+                  "programs": ["youth","kids"]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "OK",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "items": {
+                            "type": "array",
+                            "items": { "$ref": "#/components/schemas/ChurchV1" }
+                          }
+                        },
+                        "required": ["items"]
+                      },
+                      { "$ref": "#/components/schemas/GeoJSONFeatureCollection" }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "x-zuplo-route": {
+            "corsPolicy": "custom-cors",
+            "policies": {
+              "inbound": [
+                "require-api-key",
+                "ratelimit-per-partner",
+                "inject-partner-id",
+                "inject-supabase-jwt"
+              ]
+            },
+            "handler": {
+              "export": "urlRewriteHandler",
+              "module": "$import(@zuplo/runtime)",
+              "options": {
+                "rewritePattern": "${env.SUPABASE_FUNCTIONS_BASE}/churches-search",
+                "forwardSearch": true,
+                "followRedirects": false
+              }
+            }
+          },
+          "tags": ["Churches"],
+          "operationId": "churches_search_v1"
+        }
+      },
+      "/v1/churches/{id}": {
+        "get": {
+          "summary": "Get church by ID (V1)",
+          "description": "Proxies to the Supabase Edge Function `churches-get`. Always returns the **full record** for a single church. This endpoint is intended to be used after a list/search so clients can fetch complete details (e.g., belief and livestream links) without managing field projections.",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "description": "Global.Church church_id (UUIDv5).",
+              "schema": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+              },
+              "example": "9e1c2a7d-4c33-4b8b-9d7a-1a2b3c4d5e6f"
+            }
+          ],
+          "x-examples": {
+            "shadow_mountain_details": {
+              "summary": "Fetch full details for Shadow Mountain Community Church",
+              "value": {
+                "pathParams": { "id": "9e1c2a7d-4c33-4b8b-9d7a-1a2b3c4d5e6f" }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "OK",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/ChurchV1" }
+                }
+              }
+            },
+            "404": {
+              "description": "Not found"
+            }
+          },
+          "x-zuplo-route": {
+            "corsPolicy": "custom-cors",
+            "policies": {
+              "inbound": [
+                "require-api-key",
+                "ratelimit-per-partner",
+                "inject-partner-id",
+                "inject-supabase-jwt"
+              ]
+            },
+            "handler": {
+              "export": "urlRewriteHandler",
+              "module": "$import(@zuplo/runtime)",
+              "options": {
+                "rewritePattern": "${env.SUPABASE_FUNCTIONS_BASE}/churches-get?id=${request.params.id}",
+                "forwardSearch": true,
+                "followRedirects": false
+              }
+            }
+          },
+          "tags": ["Churches"],
+          "operationId": "churches_get_v1"
+        }
+      },
+      "/mcp": {
+        "post": {
+          "summary": "MCP Server",
+          "x-internal": true,
+          "description": "Handles MCP requests for the Global.Church API.",
+          "operationId": "mcp_server",
+          "x-zuplo-route": {
+            "corsPolicy": "custom-cors",
+            "mcp": { "enabled": false },
+            "handler": {
+              "export": "mcpServerHandler",
+              "module": "$import(@zuplo/runtime)",
+              "options": {
+                "name": "global-church-mcp-server",
+                "version": "1.0.0",
+                "debugMode": true,
+                "openApiFilePaths": [{ "filePath": "./config/routes.oas.json" }]
+              }
+            },
+            "policies": {
+              "inbound": [
+                "mcp-query-param-to-header-inbound",
+                "require-api-key",
+                "ratelimit-per-partner"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "components": {
+      "schemas": {
+        "ChurchV1": {
+          "type": "object",
+          "description": "Subset of columns exposed by api.v1_churches (field projection may shrink this).",
+          "properties": {
+            "church_id": { "type": "string", "format": "uuid" },
+            "gers_id": { "type": "string", "format": "uuid", "nullable": true },
+            "name": { "type": "string" },
+            "pipeline_status": { "type": "string", "nullable": true },
+            "latitude": { "type": "number", "nullable": true },
+            "longitude": { "type": "number", "nullable": true },
+            "address": { "type": "string", "nullable": true },
+            "locality": { "type": "string", "nullable": true },
+            "region": { "type": "string", "nullable": true },
+            "postal_code": { "type": "string", "nullable": true },
+            "country": { "type": "string" },
+            "website": { "type": "string", "nullable": true },
+            "phone": { "type": "string", "nullable": true },
+            "created_at": { "type": "string", "format": "date-time" },
+            "updated_at": { "type": "string", "format": "date-time" },
+            "url_giving": { "type": "string", "nullable": true },
+            "url_beliefs": { "type": "string", "nullable": true },
+            "url_youtube": { "type": "string", "nullable": true },
+            "url_facebook": { "type": "string", "nullable": true },
+            "url_instagram": { "type": "string", "nullable": true },
+            "url_tiktok": { "type": "string", "nullable": true },
+            "url_campus": { "type": "string", "nullable": true },
+            "url_live": { "type": "string", "nullable": true },
+            "contact_emails": { "type": "array", "items": { "type": "string" }, "nullable": true },
+            "contact_phones": { "type": "array", "items": { "type": "string" }, "nullable": true },
+            "service_times": { "type": "array", "items": { "type": "integer" }, "nullable": true },
+            "service_languages": { "type": "array", "items": { "type": "string" }, "nullable": true },
+            "service_source_urls": { "type": "array", "items": { "type": "string" }, "nullable": true },
+            "ministry_names": { "type": "array", "items": { "type": "string" }, "nullable": true },
+            "ministries_json": { "type": "object", "nullable": true, "additionalProperties": true },
+            "belief_type": { "type": "string", "nullable": true },
+            "denomination": { "type": "string", "nullable": true },
+            "trinitarian": { "type": "boolean", "nullable": true },
+            "extraction_confidence": { "type": "number", "nullable": true },
+            "church_summary": { "type": "string", "nullable": true },
+            "is_weekly_church": { "type": "boolean", "nullable": true },
+            "campus_name": { "type": "string", "nullable": true },
+            "overarching_name": { "type": "string", "nullable": true },
+            "is_multi_campus": { "type": "boolean", "nullable": true },
+            "distance_m": { "type": "number", "nullable": true }
+          },
+          "additionalProperties": false
+        },
+        "GeoJSONFeatureCollection": {
+          "type": "object",
+          "required": ["type", "features"],
+          "properties": {
+            "type": { "type": "string", "const": "FeatureCollection" },
+            "features": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["type", "geometry", "properties"],
+                "properties": {
+                  "type": { "type": "string", "const": "Feature" },
+                  "geometry": {
+                    "type": ["object", "null"],
+                    "properties": {
+                      "type": { "type": "string", "const": "Point" },
+                      "coordinates": {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": { "type": "number" }
+                      }
+                    },
+                    "required": ["type", "coordinates"]
+                  },
+                  "properties": {
+                    "$ref": "#/components/schemas/ChurchV1"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }

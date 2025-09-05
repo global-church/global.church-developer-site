@@ -67,8 +67,30 @@ export async function searchChurches(params: {
   service_time_end?: string;
   id?: string;
   limit?: number;
+  fields?: string;
 }): Promise<ChurchPublic[]> {
-  return fetchFromZuploAPI<ChurchPublic[]>(params);
+  // Ensure church_id is returned for linking when caller didn't specify fields
+  const next: Record<string, unknown> = { ...params };
+  if (!('fields' in next)) {
+    // Request a minimal but linkable set to reduce payload
+    next.fields = 'church_id,name,latitude,longitude,locality,region,country,website,belief_type,service_languages,service_times,geojson';
+  } else if (typeof next.fields === 'string' && !String(next.fields).split(',').map(s => s.trim()).includes('church_id')) {
+    next.fields = String(next.fields) + ',church_id';
+  }
+  return fetchFromZuploAPI<ChurchPublic[]>(next);
+}
+
+// Fetch a single church by id using the dedicated endpoint
+export async function getChurchById(id: string): Promise<ChurchPublic | null> {
+  if (!id) return null;
+  const url = new URL(`${ZUPLO_API_URL}/v1/churches/${id}`);
+  const headers: HeadersInit = { Authorization: `Bearer ${ZUPLO_API_KEY}` };
+  const res = await fetch(url.toString(), { headers });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`HTTP ${res.status} from ${url.toString()}: ${body.slice(0, 500)}`);
+  }
+  return (await res.json()) as ChurchPublic;
 }
 
 // Wrapper for the search_churches_by_bbox RPC
@@ -91,7 +113,13 @@ export async function searchChurchesByBbox(params: {
   service_time_end?: string;
   limit?: number;
 }): Promise<ChurchPublic[]> {
-  return fetchFromZuploAPI<ChurchPublic[]>(params);
+  const next: Record<string, unknown> = { ...params };
+  if (!('fields' in next)) {
+    next.fields = 'church_id,name,latitude,longitude,locality,region,country,website,belief_type,service_languages,service_times,geojson';
+  } else if (typeof next.fields === 'string' && !String(next.fields).split(',').map(s => s.trim()).includes('church_id')) {
+    next.fields = String(next.fields) + ',church_id';
+  }
+  return fetchFromZuploAPI<ChurchPublic[]>(next);
 }
 
 
@@ -114,7 +142,13 @@ export async function searchChurchesByRadius(params: {
   service_time_end?: string;
   limit?: number;
 }): Promise<ChurchWithinRadiusRow[]> {
-  return fetchFromZuploAPI<ChurchWithinRadiusRow[]>(params);
+  const next: Record<string, unknown> = { ...params };
+  if (!('fields' in next)) {
+    next.fields = 'church_id,name,latitude,longitude,locality,region,country,website,belief_type,service_languages,service_times,geojson,distance_m';
+  } else if (typeof next.fields === 'string' && !String(next.fields).split(',').map(s => s.trim()).includes('church_id')) {
+    next.fields = String(next.fields) + ',church_id';
+  }
+  return fetchFromZuploAPI<ChurchWithinRadiusRow[]>(next);
 }
 
 /**
