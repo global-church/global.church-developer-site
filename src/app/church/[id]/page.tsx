@@ -14,14 +14,16 @@ export const dynamic = 'force-dynamic'
 
 type ChurchWithOptionalRoot = ChurchPublic & { website_root?: string | null }
 
-// Accept Next's PageProps (which may wrap params as a Promise in some modes)
-// Next.js App Router Page props with `params` that may be a Promise in some modes
-type PageProps = { params: { id: string } | Promise<{ id: string }> }
-
-export default async function ChurchPage(input: PageProps) {
-  const raw = input?.params
-  const p = raw?.then ? await raw : raw
-  const id = p?.id
+// Accept Next's generated PageProps shape where params can be a Promise or undefined
+export default async function ChurchPage(
+  { params }: { params?: Promise<unknown> }
+) {
+  const p = params ? await params : undefined
+  let id: string | undefined
+  if (p && typeof p === 'object') {
+    const rec = p as Record<string, unknown>
+    if (typeof rec.id === 'string') id = rec.id
+  }
   const zuploUrl = process.env.NEXT_PUBLIC_ZUPLO_API_URL || null
   const zuploKey = process.env.NEXT_PUBLIC_ZUPLO_API_KEY || null
   const zHost = (() => { try { return zuploUrl ? new URL(zuploUrl).host : null } catch { return null } })()
