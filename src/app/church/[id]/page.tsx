@@ -16,8 +16,9 @@ type ChurchWithOptionalRoot = ChurchPublic & { website_root?: string | null }
 
 export default async function ChurchPage({
   params,
-}: { params: { id: string } }) {
-  const id = params?.id
+}: { params: { id: string } } | { params: Promise<{ id: string }> }) {
+  const p = (params as Promise<{ id: string }>)?.then ? await (params as Promise<{ id: string }>) : (params as { id: string })
+  const id = p?.id
   const zuploUrl = process.env.NEXT_PUBLIC_ZUPLO_API_URL || null
   const zuploKey = process.env.NEXT_PUBLIC_ZUPLO_API_KEY || null
   const zHost = (() => { try { return zuploUrl ? new URL(zuploUrl).host : null } catch { return null } })()
