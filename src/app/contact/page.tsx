@@ -16,6 +16,14 @@ export default function ContactPage() {
           <a href="mailto:clayton.fike@global.church" className="text-lg">clayton.fike@global.church</a>
         </div>
         <div>
+          <h3 className="text-xl font-semibold">Design</h3>
+          <a href="mailto:liz.gonya@mindfulstrategyco.com" className="text-lg">liz.gonya@mindfulstrategyco.com</a>
+        </div>
+        <div>
+          <h3 className="text-xl font-semibold">Front-End</h3>
+          <a href="mailto:mathias.boampong@mindfulstrategyco.com" className="text-lg">mathias.boampong@mindfulstrategyco.com</a>
+        </div>
+        <div>
           <h3 className="text-xl font-semibold">Data & Schema</h3>
           <a href="mailto:trent.sikute@global.church" className="text-lg">trent.sikute@global.church</a>
         </div>

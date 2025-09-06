@@ -80,8 +80,8 @@ export async function POST(req: NextRequest) {
         model: 'gpt-5-mini-2025-08-07',
         // Keep developer instructions via prompt id
         prompt: {
-          id: 'pmpt_68ba191fff508193a1b2d77008a32fa401db62f89e66a7a6',
-          version: '4',
+          id: 'pmpt_68bb5264d840819689d32aafaaa880960d02eddf0b7e2c2f',
+          version: '2',
         },
         previous_response_id: typeof previousResponseId === 'string' ? previousResponseId : undefined,
         // Supply chat history as messages so the model has context

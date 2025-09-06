@@ -12,6 +12,7 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import ServiceDayFilter from "@/components/explorer/filters/ServiceDayFilter";
 import ServiceTimeFilter from "./filters/ServiceTimeFilter";
+import DenominationFilter from "./filters/DenominationFilter";
 import ProgramsFilter from "./filters/ProgramsFilter";
 import { searchChurches } from "@/lib/zuplo";
 import { formatLanguages, normalizeLanguagesToCodes } from "@/lib/languages";
@@ -79,6 +80,25 @@ export default function ExplorerClient() {
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number; accuracy: number; isHighAccuracy: boolean } | null>(null);
 
+  // Haversine distance (km) for robust client-side distance display
+  const distanceKm = useCallback((
+    a: { lat: number; lng: number } | null,
+    b: { lat: number | null; lng: number | null } | null,
+  ): number => {
+    if (!a || !b || typeof b.lat !== 'number' || typeof b.lng !== 'number') return 0;
+    const R = 6371; // km
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const dLat = toRad(b.lat - a.lat);
+    const dLon = toRad(b.lng - a.lng);
+    const lat1 = toRad(a.lat);
+    const lat2 = toRad(b.lat);
+    const sinDLat = Math.sin(dLat / 2);
+    const sinDLon = Math.sin(dLon / 2);
+    const h = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLon * sinDLon;
+    const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+    return R * c;
+  }, []);
+
   // Fetch from backend when URL params change
   useEffect(() => {
     let isActive = true;
@@ -112,7 +132,12 @@ export default function ExplorerClient() {
             { belief, languages, service_days, service_time_start, service_time_end, programs }
           );
           if (!isActive) return;
-          setNearbyResults(data);
+          // Recompute distances client-side to avoid any unit mismatches from backend
+          const recomputed = (data || []).map((r) => ({
+            ...r,
+            distance_km: distanceKm(userLocation, { lat: r.latitude as number | null, lng: r.longitude as number | null }),
+          }));
+          setNearbyResults(recomputed);
         } else {
           const rows = await searchChurches({
             belief,
@@ -165,7 +190,11 @@ export default function ExplorerClient() {
           service_time_end,
           programs,
         });
-        const arr = data as unknown as NearbyChurch[];
+        // Recompute distances client-side to ensure correct unit handling
+        const arr = (data as unknown as NearbyChurch[]).map((r) => ({
+          ...r,
+          distance_km: distanceKm({ lat, lng }, { lat: r.latitude as number | null, lng: r.longitude as number | null }),
+        }));
         setNearbyResults(arr);
         setSearchMode('nearby');
         try {
@@ -210,13 +239,22 @@ export default function ExplorerClient() {
 
   // Languages are now provided by API; no client parsing
 
-  const formatBelief = (belief?: NearbyChurch['belief_type'] | null) => {
-    if (!belief) return null;
-    return belief
-      .split("_")
-      .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
-      .join(" ");
-  };
+const formatBelief = (belief?: NearbyChurch['belief_type'] | null) => {
+  if (!belief) return null;
+  return belief
+    .split("_")
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
+};
+
+const formatDenomination = (denom?: string | null) => {
+  if (!denom) return null;
+  return denom
+    .split(/\s+|_|-/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+};
 
   const spKey = sp.toString();
   const resultsKey = useMemo(() => {
@@ -243,6 +281,8 @@ export default function ExplorerClient() {
       region: r.region,
       country: r.country,
       website: r.website,
+      ministry_names: Array.isArray((r as { ministry_names?: string[] }).ministry_names) ? (r as { ministry_names?: string[] }).ministry_names as string[] : null,
+      denomination: r.denomination ?? null,
       service_languages: Array.isArray(r.service_languages) ? r.service_languages : null,
       service_times: Array.isArray(r.service_times) ? r.service_times : null,
       belief_type: (r.belief_type as NearbyChurch['belief_type']) ?? null,
@@ -260,20 +300,52 @@ export default function ExplorerClient() {
     const endParam = sp.get('service_time_end');
     const startM = parseTimeParam(startParam);
     const endM = parseTimeParam(endParam);
-    if (selectedServiceDays.size === 0 && startM == null && endM == null) return results;
+
+    // Denomination filter (CSV list)
+    const denomCsv = sp.get('denomination') || '';
+    const denomSelected = denomCsv
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => s.toLowerCase());
+
+    const timeDayActive = selectedServiceDays.size > 0 || startM != null || endM != null;
+    const denomActive = denomSelected.length > 0;
+    if (!timeDayActive && !denomActive) return results;
+
+    const norm = (s?: string | null) =>
+      (s ? String(s).toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim() : '');
+
     return results.filter((r) => {
-      const arr = Array.isArray((r as { service_times?: number[] }).service_times)
-        ? ((r as { service_times?: number[] }).service_times as number[])
-        : [];
-      if (arr.length === 0) return false;
-      for (const n of arr) {
-        const day = DAY_NAMES[minutesToDayIndex(n)];
-        const timeOfDay = ((n % 1440) + 1440) % 1440;
-        const dayOk = selectedServiceDays.size === 0 || selectedServiceDays.has(day);
-        const timeOk = inTimeRange(timeOfDay, startM, endM);
-        if (dayOk && timeOk) return true;
+      // Denomination check
+      let denomOk = true;
+      if (denomActive) {
+        const rd = norm((r as unknown as { denomination?: string | null }).denomination ?? null);
+        denomOk = rd.length > 0 && denomSelected.some((sel) => {
+          const selNorm = sel.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+          return rd === selNorm || rd.includes(selNorm) || selNorm.includes(rd);
+        });
       }
-      return false;
+
+      // Service day/time check
+      let timeOk = true;
+      if (timeDayActive) {
+        const arr = Array.isArray((r as { service_times?: number[] }).service_times)
+          ? ((r as { service_times?: number[] }).service_times as number[])
+          : [];
+        if (arr.length === 0) return false;
+        let anyMatch = false;
+        for (const n of arr) {
+          const day = DAY_NAMES[minutesToDayIndex(n)];
+          const timeOfDay = ((n % 1440) + 1440) % 1440;
+          const dayOk = selectedServiceDays.size === 0 || selectedServiceDays.has(day);
+          const inRange = inTimeRange(timeOfDay, startM, endM);
+          if (dayOk && inRange) { anyMatch = true; break; }
+        }
+        timeOk = anyMatch;
+      }
+
+      return denomOk && timeOk;
     });
   }, [results, selectedServiceDays, sp]);
 
@@ -384,6 +456,7 @@ export default function ExplorerClient() {
           <div className="flex gap-3 flex-wrap">
             <ServiceDayFilter />
             <ServiceTimeFilter />
+            <DenominationFilter />
             <ProgramsFilter />
           </div>
         </div>
@@ -421,6 +494,13 @@ export default function ExplorerClient() {
               const languages = Array.isArray(r.service_languages) ? r.service_languages : [];
               const languageNames = formatLanguages(languages);
               const beliefPretty = formatBelief(r.belief_type ?? null);
+              const denomPretty = formatDenomination((r as { denomination?: string | null }).denomination ?? null);
+              const ministriesRaw = Array.isArray((r as { ministry_names?: string[] }).ministry_names)
+                ? ((r as { ministry_names?: string[] }).ministry_names as string[])
+                : (Array.isArray((r as { programs_offered?: string[] }).programs_offered)
+                  ? ((r as { programs_offered?: string[] }).programs_offered as string[])
+                  : []);
+              const ministries = ministriesRaw.map((s) => String(s)).filter(Boolean);
               let times = formatServiceTimes((r as { service_times?: number[] }).service_times as number[] | undefined);
               if (selectedServiceDays.size > 0) {
                 times = times.filter((t) => selectedServiceDays.has(t.day));
@@ -448,6 +528,11 @@ export default function ExplorerClient() {
                                   {beliefPretty}
                                 </span>
                               )}
+                              {denomPretty && (
+                                <span className="inline-flex items-center rounded-md bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                                  {denomPretty}
+                                </span>
+                              )}
                               {languageNames.map((lang, idx) => (
                                 <span
                                   key={`${lang}-${idx}`}
@@ -468,6 +553,21 @@ export default function ExplorerClient() {
                               )}
                             </div>
                           </div>
+
+                          {ministries.length > 0 && (
+                            <div className="mt-1 flex items-center gap-1 flex-wrap">
+                              {ministries.slice(0, 3).map((m, i) => (
+                                <span key={`${r.church_id}-min-${i}`} className="inline-flex items-center rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                                  {m}
+                                </span>
+                              ))}
+                              {ministries.length > 3 && (
+                                <span className="text-[10px] text-gray-500 whitespace-nowrap">
+                                  +{ministries.length - 3} more in profile
+                                </span>
+                              )}
+                            </div>
+                          )}
 
                           <div className="text-sm text-gray-600 flex items-center gap-1">
                             <MapPin size={14} className="opacity-0" />
@@ -508,6 +608,11 @@ export default function ExplorerClient() {
                                   {beliefPretty}
                                 </span>
                               )}
+                              {denomPretty && (
+                                <span className="inline-flex items-center rounded-md bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                                  {denomPretty}
+                                </span>
+                              )}
                               {languageNames.map((lang, idx) => (
                                 <span
                                   key={`${lang}-${idx}`}
@@ -528,6 +633,21 @@ export default function ExplorerClient() {
                               )}
                             </div>
                           </div>
+
+                          {ministries.length > 0 && (
+                            <div className="mt-1 flex items-center gap-1 flex-wrap">
+                              {ministries.slice(0, 3).map((m, i) => (
+                                <span key={`noid-min-${i}`} className="inline-flex items-center rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                                  {m}
+                                </span>
+                              ))}
+                              {ministries.length > 3 && (
+                                <span className="text-[10px] text-gray-500 whitespace-nowrap">
+                                  +{ministries.length - 3} more in profile
+                                </span>
+                              )}
+                            </div>
+                          )}
 
                           <div className="text-sm text-gray-600 flex items-center gap-1">
                             <MapPin size={14} className="opacity-0" />

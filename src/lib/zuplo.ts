@@ -73,7 +73,7 @@ export async function searchChurches(params: {
   const next: Record<string, unknown> = { ...params };
   if (!('fields' in next)) {
     // Request a minimal but linkable set to reduce payload
-    next.fields = 'church_id,name,latitude,longitude,locality,region,country,website,belief_type,service_languages,service_times,geojson';
+    next.fields = 'church_id,name,latitude,longitude,locality,region,country,website,belief_type,denomination,ministry_names,service_languages,service_times,geojson';
   } else if (typeof next.fields === 'string' && !String(next.fields).split(',').map(s => s.trim()).includes('church_id')) {
     next.fields = String(next.fields) + ',church_id';
   }
@@ -115,7 +115,7 @@ export async function searchChurchesByBbox(params: {
 }): Promise<ChurchPublic[]> {
   const next: Record<string, unknown> = { ...params };
   if (!('fields' in next)) {
-    next.fields = 'church_id,name,latitude,longitude,locality,region,country,website,belief_type,service_languages,service_times,geojson';
+    next.fields = 'church_id,name,latitude,longitude,locality,region,country,website,belief_type,denomination,ministry_names,service_languages,service_times,geojson';
   } else if (typeof next.fields === 'string' && !String(next.fields).split(',').map(s => s.trim()).includes('church_id')) {
     next.fields = String(next.fields) + ',church_id';
   }
@@ -144,7 +144,7 @@ export async function searchChurchesByRadius(params: {
 }): Promise<ChurchWithinRadiusRow[]> {
   const next: Record<string, unknown> = { ...params };
   if (!('fields' in next)) {
-    next.fields = 'church_id,name,latitude,longitude,locality,region,country,website,belief_type,service_languages,service_times,geojson,distance_m';
+    next.fields = 'church_id,name,latitude,longitude,locality,region,country,website,belief_type,denomination,ministry_names,service_languages,service_times,geojson,distance_m';
   } else if (typeof next.fields === 'string' && !String(next.fields).split(',').map(s => s.trim()).includes('church_id')) {
     next.fields = String(next.fields) + ',church_id';
   }

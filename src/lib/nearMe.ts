@@ -15,8 +15,10 @@ export type NearbyChurch = {
   website: string | null;
   service_languages: string[] | null;
   belief_type: 'orthodox' | 'roman_catholic' | 'protestant' | 'anglican' | 'other' | 'unknown' | null;
+  denomination?: string | null;
   services_info?: string | null;
   service_times?: number[] | null;
+  ministry_names?: string[] | null;
   programs_offered?: string[] | null;
 };
 

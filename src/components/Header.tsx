@@ -12,7 +12,6 @@ const navLinks = [
   { href: "/api-docs", label: "API" },
   { href: "/mcp-server", label: "MCP" },
   { href: "/about", label: "About" },
-  { href: "/faq", label: "FAQs" },
   { href: "/contact", label: "Contact" },
 ];
 
@@ -103,5 +102,4 @@ export default function Header() {
     </header>
   );
 }
-
 

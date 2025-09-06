@@ -85,8 +85,8 @@ export default function Page() {
             </div>
           </div>
           <h2 className="text-3xl font-bold text-center pt-20 mb-0">
-            A Platform for FaithTech Innovators,<br />
-            by FaithTech Innovators
+            A shared data standard for the FaithTech community,<br />
+            by the FaithTech community 💙
           </h2>
           <div className="container mx-auto px-4 mt-16 md:mt-24 mb-0 md:mb-12 relative z-20">
           <div className="mt-24 md:mt-28 flex justify-center gap-4">
