@@ -154,7 +154,7 @@ export default function RequestAccessPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label htmlFor="projectName" className="mb-2 block text-sm font-medium text-gray-700">Project name</label>
-                <Input id="projectName" name="projectName" value={data.projectName} onChange={onChange} placeholder="App or initiative name" />
+                <Input id="projectName" name="projectName" value={data.projectName} onChange={onFieldChange} placeholder="App or initiative name" />
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">Timeline</label>
