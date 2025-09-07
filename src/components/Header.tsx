@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const navLinks = [
   { href: "/explorer", label: "Church Explorer" },
@@ -12,7 +13,7 @@ const navLinks = [
   { href: "/api-docs", label: "API" },
   { href: "/mcp-server", label: "MCP" },
   { href: "/about", label: "About" },
-  { href: "/contact", label: "Contact" },
+  { href: "/request-access", label: "Request Access" },
 ];
 
 export default function Header() {
@@ -32,9 +33,17 @@ export default function Header() {
           />
         </Link>
 
-        <div className="hidden md:flex items-center gap-6">
+        <div className="hidden md:flex items-center gap-4">
           {navLinks.map((link) => {
             const isActive = pathname === link.href;
+            const isCTA = link.href === "/request-access";
+            if (isCTA) {
+              return (
+                <Button key={link.href} asChild size="sm" className="ml-2">
+                  <Link href={link.href}>{link.label}</Link>
+                </Button>
+              );
+            }
             return (
               <Link
                 key={link.href}
@@ -84,16 +93,31 @@ export default function Header() {
 
             <div className="flex-1 overflow-y-auto">
               <div className="flex flex-col">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className="text-lg font-medium py-4 text-center border-b text-gray-800 hover:bg-gray-50"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
+                {navLinks.map((link) => {
+                  const isCTA = link.href === "/request-access";
+                  if (isCTA) {
+                    return (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        className="text-lg font-semibold py-3 mx-4 my-3 text-center rounded-md bg-primary text-primary-foreground shadow-xs hover:bg-primary/90"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        {link.label}
+                      </Link>
+                    );
+                  }
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className="text-lg font-medium py-4 text-center border-b text-gray-800 hover:bg-gray-50"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      {link.label}
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -102,4 +126,3 @@ export default function Header() {
     </header>
   );
 }
-
