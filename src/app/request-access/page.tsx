@@ -53,9 +53,14 @@ export default function RequestAccessPage() {
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; error?: string } | null>(null)
 
-  const onChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value, type, checked } = e.target
-    setData((d) => ({ ...d, [name]: type === 'checkbox' ? checked : value }))
+  const onFieldChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setData((d) => ({ ...d, [name]: value }))
+  }
+
+  const onCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target
+    setData((d) => ({ ...d, [name]: checked }))
   }
 
   const toggleEndpoint = (v: string) => {
@@ -121,27 +126,27 @@ export default function RequestAccessPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label htmlFor="fullName" className="mb-2 block text-sm font-medium text-gray-700">Full name<span className="text-red-500">*</span></label>
-                <Input id="fullName" name="fullName" value={data.fullName} onChange={onChange} aria-invalid={req(data.fullName)} placeholder="Jane Doe" required />
+                <Input id="fullName" name="fullName" value={data.fullName} onChange={onFieldChange} aria-invalid={req(data.fullName)} placeholder="Jane Doe" required />
               </div>
               <div>
                 <label htmlFor="email" className="mb-2 block text-sm font-medium text-gray-700">Work email<span className="text-red-500">*</span></label>
-                <Input id="email" name="email" type="email" value={data.email} onChange={onChange} aria-invalid={req(data.email)} placeholder="jane@yourorg.org" required />
+                <Input id="email" name="email" type="email" value={data.email} onChange={onFieldChange} aria-invalid={req(data.email)} placeholder="jane@yourorg.org" required />
               </div>
               <div>
                 <label htmlFor="company" className="mb-2 block text-sm font-medium text-gray-700">Company / Organization<span className="text-red-500">*</span></label>
-                <Input id="company" name="company" value={data.company} onChange={onChange} aria-invalid={req(data.company)} placeholder="Your Organization" required />
+                <Input id="company" name="company" value={data.company} onChange={onFieldChange} aria-invalid={req(data.company)} placeholder="Your Organization" required />
               </div>
               <div>
                 <label htmlFor="roleTitle" className="mb-2 block text-sm font-medium text-gray-700">Role / Title</label>
-                <Input id="roleTitle" name="roleTitle" value={data.roleTitle} onChange={onChange} placeholder="Developer, PM, etc." />
+                <Input id="roleTitle" name="roleTitle" value={data.roleTitle} onChange={onFieldChange} placeholder="Developer, PM, etc." />
               </div>
               <div>
                 <label htmlFor="website" className="mb-2 block text-sm font-medium text-gray-700">Website</label>
-                <Input id="website" name="website" value={data.website} onChange={onChange} placeholder="https://example.org" />
+                <Input id="website" name="website" value={data.website} onChange={onFieldChange} placeholder="https://example.org" />
               </div>
               <div>
                 <label htmlFor="country" className="mb-2 block text-sm font-medium text-gray-700">Country</label>
-                <Input id="country" name="country" value={data.country} onChange={onChange} placeholder="United States" />
+                <Input id="country" name="country" value={data.country} onChange={onFieldChange} placeholder="United States" />
               </div>
             </div>
 
@@ -167,7 +172,7 @@ export default function RequestAccessPage() {
 
             <div>
               <label htmlFor="useCase" className="mb-2 block text-sm font-medium text-gray-700">Use case / project description<span className="text-red-500">*</span></label>
-              <Textarea id="useCase" name="useCase" value={data.useCase} onChange={onChange} aria-invalid={req(data.useCase)} placeholder="Describe what you’re building, who it serves, and how you plan to use the API." required />
+              <Textarea id="useCase" name="useCase" value={data.useCase} onChange={onFieldChange} aria-invalid={req(data.useCase)} placeholder="Describe what you’re building, who it serves, and how you plan to use the API." required />
             </div>
 
             {/* Endpoints & usage */}
@@ -200,7 +205,7 @@ export default function RequestAccessPage() {
                 </div>
                 <div>
                   <label htmlFor="regions" className="mb-2 block text-sm font-medium text-gray-700">Regions of interest</label>
-                  <Input id="regions" name="regions" value={data.regions} onChange={onChange} placeholder="e.g., North America, Europe, Sub-Saharan Africa" />
+                  <Input id="regions" name="regions" value={data.regions} onChange={onFieldChange} placeholder="e.g., North America, Europe, Sub-Saharan Africa" />
                 </div>
               </div>
             </div>
@@ -209,21 +214,21 @@ export default function RequestAccessPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <label htmlFor="teamSize" className="mb-2 block text-sm font-medium text-gray-700">Team size</label>
-                <Input id="teamSize" name="teamSize" value={data.teamSize} onChange={onChange} placeholder="e.g., 1–5" />
+                <Input id="teamSize" name="teamSize" value={data.teamSize} onChange={onFieldChange} placeholder="e.g., 1–5" />
               </div>
               <div>
                 <label htmlFor="github" className="mb-2 block text-sm font-medium text-gray-700">GitHub (optional)</label>
-                <Input id="github" name="github" value={data.github} onChange={onChange} placeholder="https://github.com/your-org" />
+                <Input id="github" name="github" value={data.github} onChange={onFieldChange} placeholder="https://github.com/your-org" />
               </div>
               <div>
                 <label htmlFor="heardFrom" className="mb-2 block text-sm font-medium text-gray-700">How did you hear about us?</label>
-                <Input id="heardFrom" name="heardFrom" value={data.heardFrom} onChange={onChange} placeholder="Referral, FaithTech, search, etc." />
+                <Input id="heardFrom" name="heardFrom" value={data.heardFrom} onChange={onFieldChange} placeholder="Referral, FaithTech, search, etc." />
               </div>
             </div>
 
             <div>
               <label htmlFor="notes" className="mb-2 block text-sm font-medium text-gray-700">Anything else we should know?</label>
-              <Textarea id="notes" name="notes" value={data.notes} onChange={onChange} placeholder="Additional context, constraints, or questions." />
+              <Textarea id="notes" name="notes" value={data.notes} onChange={onFieldChange} placeholder="Additional context, constraints, or questions." />
             </div>
 
             <div className="flex items-start gap-3">
@@ -233,7 +238,7 @@ export default function RequestAccessPage() {
                 type="checkbox"
                 className="mt-1 size-4 rounded border-gray-300"
                 checked={data.termsAccepted}
-                onChange={onChange}
+                onChange={onCheckboxChange}
               />
               <label htmlFor="termsAccepted" className="text-sm text-gray-700">
                 I agree to responsible use of the API and understand that access may be adjusted to protect platform stability and data quality. <span className="text-red-500">*</span>
