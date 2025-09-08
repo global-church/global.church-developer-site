@@ -23,15 +23,18 @@ export default function Header() {
   return (
     <header className="py-4 px-6 md:px-8 border-b border-gray-200">
       <nav className="flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
-          <Image
-            src="/gc-logo.png"
-            alt="Global.Church Logo"
-            width={180}
-            height={40}
-            priority
-          />
-        </Link>
+        <div className="flex flex-col items-center">
+          <Link href="/" className="flex items-center gap-2">
+            <Image
+              src="/gc-logo.png"
+              alt="Global.Church Logo"
+              width={180}
+              height={40}
+              priority
+            />
+          </Link>
+          <span className="text-[12px] text-gray-700 leading-tight mt-0.5">Developer Site &lt;/&gt;</span>
+        </div>
 
         <div className="hidden md:flex items-center gap-4">
           {navLinks.map((link) => {
@@ -72,15 +75,18 @@ export default function Header() {
         <div className="fixed inset-0 z-50 bg-white">
           <div className="flex flex-col h-full">
             <div className="flex items-center justify-between py-4 px-6 border-b">
-              <Link href="/" className="flex items-center gap-2" onClick={() => setIsMenuOpen(false)}>
-                <Image
-                  src="/gc-logo.png"
-                  alt="Global.Church Logo"
-                  width={180}
-                  height={40}
-                  priority
-                />
-              </Link>
+              <div className="flex flex-col items-center">
+                <Link href="/" className="flex items-center gap-2" onClick={() => setIsMenuOpen(false)}>
+                  <Image
+                    src="/gc-logo.png"
+                    alt="Global.Church Logo"
+                    width={180}
+                    height={40}
+                    priority
+                  />
+                </Link>
+                <span className="text-[12px] text-gray-700 leading-tight mt-0.5">Developer Site &lt;/&gt;</span>
+              </div>
               <button
                 type="button"
                 className="inline-flex items-center justify-center rounded-md p-2 text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
