@@ -422,7 +422,7 @@ export default function LeafletMapInner({
           min_lat: p_min_lat,
           max_lng: p_max_lng,
           max_lat: p_max_lat,
-          limit: 500,
+          limit: 10000,
         })
         // Guard against stale responses
         if (reqId !== requestIdRef.current) return

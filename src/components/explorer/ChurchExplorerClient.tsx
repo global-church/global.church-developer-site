@@ -128,7 +128,7 @@ export default function ExplorerClient() {
             userLocation.lat,
             userLocation.lng,
             radiusForRpcKm,
-            50,
+            10000,
             { belief, languages, service_days, service_time_start, service_time_end, programs }
           );
           if (!isActive) return;
@@ -146,6 +146,7 @@ export default function ExplorerClient() {
             service_time_start,
             service_time_end,
             programs,
+            limit: 10000,
           });
           if (!isActive) return;
           setServerResults(Array.isArray(rows) ? rows : []);
@@ -182,7 +183,7 @@ export default function ExplorerClient() {
         const programsStr = sp.get('programs') || '';
         const programs = programsStr ? [programsStr] : undefined;
 
-        const data = await fetchNearbyChurches(lat, lng, radiusForRpcKm, 50, {
+        const data = await fetchNearbyChurches(lat, lng, radiusForRpcKm, 10000, {
           belief,
           languages,
           service_days,

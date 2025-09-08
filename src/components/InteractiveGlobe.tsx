@@ -50,7 +50,7 @@ export default function InteractiveGlobe() {
     // Limit payload to essential fields for performance
     searchChurchesGeoJSON({
       // Avoid fields projection; some backends may error when mixing with format
-      limit: 3000,
+      limit: 10000,
     })
       .then((fc) => {
         const pts: ChurchPoint[] = [];

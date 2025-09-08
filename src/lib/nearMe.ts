@@ -26,7 +26,7 @@ export async function fetchNearbyChurches(
   lat: number,
   lng: number,
   radiusKm = 25,
-  maxResults = 50,
+  maxResults = 10000,
   filters?: {
     belief?: string | string[];
     languages?: string[];

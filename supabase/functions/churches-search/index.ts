@@ -147,8 +147,8 @@ serve(async (req)=>{
     const p_postal_code = qp.get("postal_code");
     const equals_id = qp.get("id");
     const limitRaw = parseNum(qp, "limit");
-    // Align with OpenAPI (max 100). Keep 25 as default.
-    const p_limit = Math.max(1, Math.min(limitRaw ?? 25, 100));
+    // Align with updated OpenAPI (max 10,000). Keep 25 as default to avoid huge payloads when caller omits limit.
+    const p_limit = Math.max(1, Math.min(limitRaw ?? 25, 10_000));
     // Multi-select
     const p_languages = parseList(qp, "languages");
     const p_programs = parseList(qp, "programs");
