@@ -25,9 +25,10 @@ type ChurchPoint = {
   locality?: string | null;
   region?: string | null;
   country?: string;
+  belief?: string | null; // belief_type
 };
 
-export default function InteractiveGlobe() {
+export default function InteractiveGlobe({ colorMode = 'country' }: { colorMode?: 'country' | 'belief' }) {
   const router = useRouter();
   const globeRef = useRef<GlobeMethods>(null!);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -46,11 +47,11 @@ export default function InteractiveGlobe() {
       .then(setCountries)
       .catch(err => console.error("Failed to fetch GeoJSON:", err));
 
-    // Fetch a sample of churches as GeoJSON for globe pins
-    // Limit payload to essential fields for performance
+    // Fetch churches as GeoJSON for globe pins
+    // Request minimal fields needed for color modes and positioning
     searchChurchesGeoJSON({
-      // Avoid fields projection; some backends may error when mixing with format
       limit: 10000,
+      fields: 'church_id,name,latitude,longitude,country,belief_type',
     })
       .then((fc) => {
         const pts: ChurchPoint[] = [];
@@ -66,7 +67,8 @@ export default function InteractiveGlobe() {
           const locality = (props.locality as string | null) ?? null;
           const region = (props.region as string | null) ?? null;
           const country = (props.country as string | null) ?? undefined;
-          pts.push({ lat, lng, id, name, locality, region, country });
+          const belief = (props.belief_type as string | null) ?? null;
+          pts.push({ lat, lng, id, name, locality, region, country, belief });
         }
         setChurchPoints(pts);
       })
@@ -213,15 +215,29 @@ export default function InteractiveGlobe() {
     return material;
   }, []);
 
-  // Rainbow color coding per country (stable mapping)
+  // Fixed palette for belief families
+  const BELIEF_COLORS: Record<string, string> = {
+    roman_catholic: '#d97706', // amber-600
+    protestant: '#2563eb',     // blue-600
+    orthodox: '#dc2626',       // red-600
+    anglican: '#16a34a',       // green-600
+    other: '#7c3aed',          // violet-600
+    unknown: '#6b7280',        // gray-500
+  };
+
+  // Color mapper per selected mode
   const colorForPoint = (p: ChurchPoint): string => {
+    if (colorMode === 'belief') {
+      const key = (p.belief || 'unknown').toLowerCase();
+      return BELIEF_COLORS[key] || BELIEF_COLORS.unknown;
+    }
+    // Country mode: rainbow mapping per country code
     const key = (p.country || p.id || '').toString();
-    // Deterministic simple hash → hue
     let hash = 0;
     for (let i = 0; i < key.length; i++) hash = (hash * 131 + key.charCodeAt(i)) >>> 0;
-    const hue = hash % 360; // full rainbow
-    const saturation = 50; // lower saturation for pastel feel
-    const lightness = 70; // higher lightness for softer colors
+    const hue = hash % 360;
+    const saturation = 50;
+    const lightness = 70;
     return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
   };
 

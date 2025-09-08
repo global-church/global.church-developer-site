@@ -77,6 +77,12 @@ export async function searchChurches(params: {
   } else if (typeof next.fields === 'string' && !String(next.fields).split(',').map(s => s.trim()).includes('church_id')) {
     next.fields = String(next.fields) + ',church_id';
   }
+  // Safety: when no filters are provided, hint backend to use globe-optimized RPC
+  // This avoids passing null array args to a stricter RPC implementation in some environments.
+  const hasNoFilters = !next.q && !next.country && !next.belief && !next.region && !next.locality && !next.postal_code && !next.languages && !next.programs && !next.id;
+  if (hasNoFilters && !('for_globe' in next)) {
+    next.for_globe = true;
+  }
   return fetchFromZuploAPI<ChurchPublic[]>(next);
 }
 

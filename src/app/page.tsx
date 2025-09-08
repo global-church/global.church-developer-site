@@ -7,9 +7,12 @@ import { Button } from "@/components/ui/button";
 import FeatureCard from "@/components/FeatureCard";
 import { FileText, Code, Lock } from "lucide-react";
 import GlobeLoader from "@/components/GlobeLoader";
+import { useState } from "react";
+import { Flag, Church } from "lucide-react";
 
 
 export default function Page() {
+  const [globeColorMode, setGlobeColorMode] = useState<'country' | 'belief'>('country');
 
   return (
     <div>
@@ -30,13 +33,62 @@ export default function Page() {
           <div className="h-[520px] md:h-[720px]" />
           <div className="absolute inset-0 flex items-center justify-center">
             {/* Full-bleed globe centered in the spacer; can extend beyond without clipping */}
-            <GlobeLoader />
+            <GlobeLoader colorMode={globeColorMode} />
           </div>
         </div>
 
         {/* CTA buttons stay constrained under the globe */}
         <div className="container mx-auto px-4 mt-16 md:mt-24 mb-0 md:mb-12 relative z-20">
-          <div className="mt-24 md:mt-28 flex justify-center gap-4">
+          {/* Globe color mode toggle */}
+          <div className="flex justify-center">
+            <div role="group" aria-label="Globe color mode" className="inline-flex items-center rounded-full bg-white/80 backdrop-blur shadow ring-1 ring-white/50 overflow-hidden">
+              <button
+                type="button"
+                aria-pressed={globeColorMode === 'country'}
+                aria-label="Color by country"
+                onClick={() => setGlobeColorMode('country')}
+                className={`px-3 py-2 transition-colors ${globeColorMode === 'country' ? 'bg-gray-200 text-gray-900' : 'text-gray-600 hover:bg-white/60'}`}
+                title="Color by country"
+              >
+                <Flag size={18} />
+              </button>
+              <button
+                type="button"
+                aria-pressed={globeColorMode === 'belief'}
+                aria-label="Color by belief type"
+                onClick={() => setGlobeColorMode('belief')}
+                className={`px-3 py-2 transition-colors ${globeColorMode === 'belief' ? 'bg-gray-200 text-gray-900' : 'text-gray-600 hover:bg-white/60'}`}
+                title="Color by belief type"
+              >
+                <Church size={18} />
+              </button>
+            </div>
+          </div>
+          {/* Belief legend (only when belief mode is selected) */}
+          {globeColorMode === 'belief' && (
+            <div className="mt-3 flex justify-center">
+              <ul className="flex items-center gap-4 bg-white/80 backdrop-blur rounded-full px-4 py-2 shadow ring-1 ring-white/50">
+                {[
+                  { key: 'roman_catholic', label: 'Roman Catholic', color: '#d97706' },
+                  { key: 'protestant', label: 'Protestant', color: '#2563eb' },
+                  { key: 'orthodox', label: 'Orthodox', color: '#dc2626' },
+                  { key: 'anglican', label: 'Anglican', color: '#16a34a' },
+                  { key: 'other', label: 'Other', color: '#7c3aed' },
+                  { key: 'unknown', label: 'Unknown', color: '#6b7280' },
+                ].map((b) => (
+                  <li key={b.key} className="flex items-center gap-2 text-sm text-gray-800">
+                    <span
+                      aria-hidden
+                      className="inline-block rounded-full"
+                      style={{ width: 12, height: 12, backgroundColor: b.color }}
+                    />
+                    <span>{b.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="mt-8 md:mt-10 flex justify-center gap-4">
             <Button asChild size="lg">
               <Link href="/explorer">Explore Churches</Link>
             </Button>

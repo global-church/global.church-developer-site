@@ -1,6 +1,6 @@
 // supabase/functions/churches-search/index.ts
 // VERY IMPORTANT: THIS IS FOR REFERENCE ONLY. The actual implementation of this edge function is in Supabase.
-// Last synced: 2025-09-05
+// Last synced: 2025-09-08
 // This edge function routes to the correct RPC based on query params.
 
 
@@ -212,8 +212,8 @@ serve(async (req)=>{
         p_lat: center_lat,
         p_lng: center_lng,
         p_radius_meters: (radius_km as number) * 1000,
-        p_languages,
-        p_programs
+        ...(p_languages !== null ? { p_languages } : {}),
+        ...(p_programs !== null ? { p_programs } : {}),
       };
     } else if (bboxProvided) {
       functionName = "search_churches_by_bbox";
@@ -223,16 +223,16 @@ serve(async (req)=>{
         max_lat,
         min_lng,
         max_lng,
-        p_languages,
-        p_programs
+        ...(p_languages !== null ? { p_languages } : {}),
+        ...(p_programs !== null ? { p_programs } : {}),
       };
     } else {
       functionName = "search_churches";
       rpcArgs = {
         ...baseArgs,
-        p_languages,
-        p_programs,
-        equals_id
+        ...(p_languages !== null ? { p_languages } : {}),
+        ...(p_programs !== null ? { p_programs } : {}),
+        equals_id,
       };
     }
     // ---------- Call RPC ----------
