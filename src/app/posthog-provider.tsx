@@ -25,7 +25,17 @@ export default function PostHogAnalyticsProvider({
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
     const isDev = process.env.NODE_ENV === 'development';
-    if (!apiKey || isDev) return;
+    const isProd = process.env.NODE_ENV === 'production';
+    if (!apiKey) {
+      if (isProd) {
+        // Surface a clear hint during production if PostHog is not configured
+        // (useful when env var is missing in Vercel)
+        // eslint-disable-next-line no-console
+        console.warn('[PostHog] NEXT_PUBLIC_POSTHOG_KEY is missing. Analytics are disabled.');
+      }
+      return;
+    }
+    if (isDev) return;
 
     posthog.init(apiKey, {
       api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || '/posthog',
