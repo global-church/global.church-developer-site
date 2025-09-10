@@ -7,6 +7,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PostHogAnalyticsProvider from './posthog-provider';
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 const instrumentSans = Instrument_Sans({
   subsets: ["latin"],
@@ -47,6 +48,8 @@ export default function RootLayout({
         </PostHogAnalyticsProvider>
         {/* Vercel Web Analytics (production only) */}
         <Analytics mode="production" />
+        {/* Vercel Speed Insights */}
+        <SpeedInsights />
       </body>
     </html>
   );
