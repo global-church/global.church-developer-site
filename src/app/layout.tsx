@@ -5,6 +5,8 @@ import { Instrument_Sans, Onest } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import PostHogAnalyticsProvider from './posthog-provider';
+import { Analytics } from '@vercel/analytics/react';
 
 const instrumentSans = Instrument_Sans({
   subsets: ["latin"],
@@ -38,9 +40,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${instrumentSans.variable} ${onest.variable} antialiased bg-white flex flex-col min-h-screen`}>
-        <Header />
-        <main className="flex-grow">{children}</main>
-        <Footer />
+        <PostHogAnalyticsProvider>
+          <Header />
+          <main className="flex-grow">{children}</main>
+          <Footer />
+        </PostHogAnalyticsProvider>
+        {/* Vercel Web Analytics (production only) */}
+        <Analytics mode="production" />
       </body>
     </html>
   );

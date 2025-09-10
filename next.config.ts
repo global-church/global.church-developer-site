@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'img.youtube.com' },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/posthog/:path*',
+        destination: 'https://us.i.posthog.com/:path*',
+      },
+    ];
+  },
   // eslint: {
   //   ignoreDuringBuilds: true,
   // },
