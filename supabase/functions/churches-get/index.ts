@@ -1,37 +1,139 @@
-// supabase/functions/churches-get/index.ts
+// supabase/functions/churches-search/index.ts
+// VERY IMPORTANT: THIS IS FOR REFERENCE ONLY. The actual implementation of this edge function is in Supabase.
+// Last synced: 2025-09-22
+
+// This edge function routes to the correct RPC based on query params.
+
 // NEW: Full-details endpoint for a single church (no projection).
 // Proxied by Zuplo route: GET /v1/churches/{id}  ->  ${SUPABASE_FUNCTIONS_BASE}/churches-get?id=:idin
 // Requires Zuplo ↔ Supabase shared secret via "apikey" header.
-//
+
 // Runtime: Deno (Supabase Edge Functions)
 // Docs: https://supabase.com/docs/guides/functions (Edge Functions) and
 //       https://supabase.com/docs/reference/javascript/select (schema() + select)
 
-// IMPORTANT: This is for reference only. The actual implementation is in Supabase.
-// Last synced: 2025-09-05
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-const ZUPLO_SECRET = Deno.env.get("ZUPLO_GATEWAY_TOKEN"); // must match Zuplo policy
+const ZUPLO_SECRET = Deno.env.get("ZUPLO_GATEWAY_TOKEN"); // keep in sync with Supabase env
 const supabaseUrl = Deno.env.get("SB_URL");
 const serviceKey = Deno.env.get("SB_SERVICE_ROLE_KEY");
-if (!supabaseUrl || !serviceKey) {
-  console.error("Missing SB_URL or SB_SERVICE_ROLE_KEY env vars");
-}
 const supabase = createClient(supabaseUrl, serviceKey, {
   auth: {
     persistSession: false
   }
 });
-/** JSON helper */ const json = (body, status = 200)=>new Response(JSON.stringify(body), {
+/**
+ * Source of truth for columns available on api.v1_churches.
+ * If the view evolves, update this list (safe superset).
+ * Used for input validation & field projection.
+ */ const V1_COLUMNS = new Set([
+  "church_id",
+  "gers_id",
+  "name",
+  "pipeline_status",
+  "latitude",
+  "longitude",
+  "address",
+  "locality",
+  "region",
+  "postal_code",
+  "country",
+  "website",
+  "phone",
+  "created_at",
+  "updated_at",
+  "url_giving",
+  "url_beliefs",
+  "url_youtube",
+  "url_facebook",
+  "url_instagram",
+  "url_tiktok",
+  "url_campus",
+  "url_live",
+  "contact_emails",
+  "contact_phones",
+  "service_times",
+  "service_languages",
+  "service_source_urls",
+  "ministry_names",
+  "ministries_json",
+  "belief_type",
+  "denomination",
+  "trinitarian",
+  "extraction_confidence",
+  "church_summary",
+  "is_weekly_church",
+  "campus_name",
+  "overarching_name",
+  "is_multi_campus",
+  // The radius RPC also returns "distance_m"; include it here for projection if present.
+  "distance_m"
+]);
+/** Default lean projection for list/search – MUST include church_id for linking. */ const DEFAULT_FIELDS = [
+  "church_id",
+  "name",
+  "address",
+  "locality",
+  "region",
+  "country",
+  "website",
+  "url_beliefs",
+  "url_giving",
+  "url_live",
+  "latitude",
+  "longitude"
+];
+/** Small helpers */ const pick = (obj, keys)=>{
+  const out = {};
+  for (const k of keys)if (k in obj) out[k] = obj[k];
+  return out;
+};
+const parseList = (qp, key)=>{
+  const raw = qp.getAll(key).flatMap((s)=>s.split(",")).map((s)=>s.trim()).filter(Boolean);
+  return raw.length ? raw : null; // supports ?k=a,b and ?k=a&k=b
+};
+const parseNum = (qp, key)=>{
+  const v = qp.get(key);
+  if (v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+const parseBool = (qp, key)=>{
+  if (!qp.has(key)) return null;
+  const v = (qp.get(key) || "").toLowerCase();
+  return v === "true" ? true : v === "false" ? false : null;
+};
+const json = (body, status = 200)=>new Response(JSON.stringify(body), {
     status,
     headers: {
       "Content-Type": "application/json; charset=utf-8"
     }
   });
-/** Simple UUID v4/v5 guard (accepts any valid UUID format) */ const UUID_PATTERN = /^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i;
+/** Build GeoJSON FeatureCollection from rows (longitude/latitude MUST be present) */ const toGeoJSON = (rows, fields)=>{
+  const propsKeys = fields?.filter((k)=>k !== "longitude" && k !== "latitude") ?? null;
+  const features = rows.map((r)=>{
+    const lon = r.longitude, lat = r.latitude;
+    const props = propsKeys ? pick(r, propsKeys) : r;
+    return {
+      type: "Feature",
+      geometry: lon != null && lat != null ? {
+        type: "Point",
+        coordinates: [
+          lon,
+          lat
+        ]
+      } : null,
+      properties: props
+    };
+  });
+  return {
+    type: "FeatureCollection",
+    features
+  };
+};
 serve(async (req)=>{
-  // 🔐 Zuplo↔Supabase handshake (shared secret travels in 'apikey' header)
+  // 🔐 Zuplo↔Supabase handshake
   const apiKey = req.headers.get("apikey");
   if (!ZUPLO_SECRET || apiKey !== ZUPLO_SECRET) {
     return json({
@@ -40,40 +142,150 @@ serve(async (req)=>{
   }
   try {
     const url = new URL(req.url);
-    // Primary: Zuplo forwards the path param as a query string (?id=...)
-    const id = url.searchParams.get("id")?.trim() || "";
-    if (!id) {
-      return json({
-        error: "Missing required parameter: id"
-      }, 400);
+    const qp = url.searchParams;
+    // ---------- Parse common query params ----------
+    const q = qp.get("q") ?? qp.get("church_name") ?? null;
+    const p_country = qp.get("country");
+    const p_belief = qp.get("belief");
+    const p_trinit = parseBool(qp, "trinitarian"); // NOTE: `trinitarian` doesn't add value to the search since all records are true.
+    const p_region = qp.get("region");
+    const p_locality = qp.get("locality");
+    const p_postal_code = qp.get("postal_code");
+    const equals_id = qp.get("id");
+    const limitRaw = parseNum(qp, "limit");
+    // Align with updated OpenAPI (max 10,000). Keep 25 as default to avoid huge payloads when caller omits limit.
+    const p_limit = Math.max(1, Math.min(limitRaw ?? 25, 10_000));
+    // Multi-select
+    const p_languages = parseList(qp, "languages");
+    const p_programs = parseList(qp, "programs");
+    // Back-compat single
+    const p_language = qp.get("language") ?? (p_languages?.length === 1 ? p_languages[0] : null);
+    const p_program = qp.get("program") ?? (p_programs?.length === 1 ? p_programs[0] : null);
+    // Geo selectors
+    const min_lat = parseNum(qp, "min_lat");
+    const max_lat = parseNum(qp, "max_lat");
+    const min_lng = parseNum(qp, "min_lng");
+    const max_lng = parseNum(qp, "max_lng");
+    const center_lat = parseNum(qp, "center_lat");
+    const center_lng = parseNum(qp, "center_lng");
+    const radius_km = parseNum(qp, "radius_km");
+    const bboxProvided = [
+      min_lat,
+      max_lat,
+      min_lng,
+      max_lng
+    ].every((v)=>v !== null);
+    const radiusProvided = [
+      center_lat,
+      center_lng,
+      radius_km
+    ].every((v)=>v !== null);
+    // Response shaping
+    const fieldsParam = qp.get("fields"); // e.g., fields=name,latitude,longitude,website
+    let fields = null;
+    if (fieldsParam && fieldsParam.trim().length) {
+      fields = fieldsParam.split(",").map((s)=>s.trim()).filter((s)=>V1_COLUMNS.has(s));
+      if (!fields.includes("church_id")) fields.push("church_id");
+      if (fields.length === 0) fields = null; // fall back if nothing valid
+    } else {
+      // No explicit projection requested: return a lean, helpful set with key links
+      fields = [
+        ...DEFAULT_FIELDS
+      ];
     }
-    if (!UUID_PATTERN.test(id)) {
-      return json({
-        error: "Invalid id: must be a UUID"
-      }, 400);
+    const format = (qp.get("format") || "json").toLowerCase(); // "json" | "geojson"
+    const forGlobe = parseBool(qp, "for_globe") === true;
+    let functionName;
+    let rpcArgs;
+    const baseArgs = {
+      q,
+      p_country,
+      p_belief,
+      p_trinit,
+      p_region,
+      p_locality,
+      p_postal_code,
+      p_limit
+    };
+    if (forGlobe) {
+      functionName = "churches_for_globe";
+      rpcArgs = {
+        p_limit
+      };
+    } else if (radiusProvided) {
+      functionName = "search_churches_by_radius";
+      rpcArgs = {
+        ...baseArgs,
+        p_lat: center_lat,
+        p_lng: center_lng,
+        p_radius_meters: radius_km * 1000,
+        ...p_languages !== null ? {
+          p_languages
+        } : {},
+        ...p_programs !== null ? {
+          p_programs
+        } : {}
+      };
+    } else if (bboxProvided) {
+      functionName = "search_churches_by_bbox";
+      rpcArgs = {
+        ...baseArgs,
+        min_lat,
+        max_lat,
+        min_lng,
+        max_lng,
+        ...p_languages !== null ? {
+          p_languages
+        } : {},
+        ...p_programs !== null ? {
+          p_programs
+        } : {}
+      };
+    } else {
+      functionName = "search_churches";
+      rpcArgs = {
+        ...baseArgs,
+        ...p_languages !== null ? {
+          p_languages
+        } : {},
+        ...p_programs !== null ? {
+          p_programs
+        } : {},
+        equals_id
+      };
     }
-    // Prefer SECURITY DEFINER RPC to avoid permission issues when service role key is absent
-    // Equivalent to: SELECT * FROM api.v1_churches WHERE church_id = :id LIMIT 1
-    const { data, error } = await supabase
-      .schema("api")
-      .rpc("search_churches", { equals_id: id, p_limit: 1 });
-    if (error) {
-      // Differentiate not found vs other errors where possible
-      // (supabase-js sets error.code === 'PGRST116' sometimes for no rows; .single() normalizes though)
-      return json({
-        error: error.message
-      }, 400);
+    // ---------- Call RPC ----------
+    const { data, error } = await supabase.schema("api").rpc(functionName, rpcArgs);
+    if (error) return json({
+      error: error.message
+    }, 400);
+    // ---------- Field projection & formatting ----------
+    let items = data ?? [];
+    // Back-compat: if caller only provided singular params, filter client-side to be forgiving.
+    // (The RPC already handles arrays; this is just a small UX nicety.)
+    if (p_language && Array.isArray(items)) {
+      items = items.filter((r)=>Array.isArray(r?.service_languages) ? r.service_languages?.some((v)=>(v || "").toLowerCase() === p_language.toLowerCase()) : true);
     }
-    const row = Array.isArray(data) ? (data[0] || null) : (data || null)
-    if (!row) {
-      return json({
-        error: "Not found"
-      }, 404);
+    if (p_program && Array.isArray(items)) {
+      items = items.filter((r)=>Array.isArray(r?.ministry_names) ? r.ministry_names?.some((v)=>v?.toLowerCase().includes(p_program.toLowerCase())) : true);
     }
-    // ✅ Always return the full record
-    return json(row, 200);
+    if (fields?.length) {
+      // Ensure GeoJSON has coordinates even if caller omitted them
+      const needCoords = format === "geojson" && (!fields.includes("latitude") || !fields.includes("longitude"));
+      const projFields = needCoords ? Array.from(new Set([
+        ...fields,
+        "latitude",
+        "longitude"
+      ])) : fields;
+      items = items.map((row)=>pick(row, projFields));
+    }
+    if (format === "geojson") {
+      return json(toGeoJSON(items, fields ?? undefined), 200);
+    }
+    return json({
+      items
+    }, 200);
   } catch (e) {
-    console.error("churches-get error:", e);
     return json({
       error: String(e)
     }, 500);

@@ -98,10 +98,11 @@ const parseBool = (qp, key)=>{
   const v = (qp.get(key) || "").toLowerCase();
   return v === "true" ? true : v === "false" ? false : null;
 };
-const json = (body, status = 200)=>new Response(JSON.stringify(body), {
+const json = (body, status = 200, extraHeaders = {})=>new Response(JSON.stringify(body), {
     status,
     headers: {
-      "Content-Type": "application/json; charset=utf-8"
+      "Content-Type": "application/json; charset=utf-8",
+      ...extraHeaders
     }
   });
 /** Build GeoJSON FeatureCollection from rows (longitude/latitude MUST be present) */ const toGeoJSON = (rows, fields)=>{
@@ -126,6 +127,105 @@ const json = (body, status = 200)=>new Response(JSON.stringify(body), {
     features
   };
 };
+class BadRequestError extends Error {
+  status: number;
+  constructor(message: string) {
+    super(message);
+    this.status = 400;
+  }
+}
+type CursorMode = "rank" | "dist" | "id";
+type CursorPayload = {
+  mode: "rank";
+  rank: number;
+  id: string;
+} | {
+  mode: "dist";
+  dist: number;
+  id: string;
+} | {
+  mode: "id";
+  id: string;
+};
+const b64UrlEncode = (value: string)=>btoa(value).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const b64UrlDecode = (value: string)=>{
+  const padLength = (4 - value.length % 4) % 4;
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat(padLength);
+  return atob(padded);
+};
+const encodeCursor = (payload: CursorPayload)=>b64UrlEncode(JSON.stringify(payload));
+const decodeCursor = (raw: string): CursorPayload=>{
+  try {
+    const parsed = JSON.parse(b64UrlDecode(raw));
+    if (!parsed || typeof parsed !== "object" || typeof parsed.mode !== "string") {
+      throw new BadRequestError("Invalid cursor format");
+    }
+    if (parsed.mode === "rank") {
+      if (typeof parsed.rank !== "number" || typeof parsed.id !== "string") {
+        throw new BadRequestError("Invalid rank cursor payload");
+      }
+      return {
+        mode: "rank",
+        rank: parsed.rank,
+        id: parsed.id
+      };
+    }
+    if (parsed.mode === "dist") {
+      if (typeof parsed.dist !== "number" || typeof parsed.id !== "string") {
+        throw new BadRequestError("Invalid distance cursor payload");
+      }
+      return {
+        mode: "dist",
+        dist: parsed.dist,
+        id: parsed.id
+      };
+    }
+    if (parsed.mode === "id") {
+      if (typeof parsed.id !== "string") {
+        throw new BadRequestError("Invalid id cursor payload");
+      }
+      return {
+        mode: "id",
+        id: parsed.id
+      };
+    }
+    throw new BadRequestError("Unsupported cursor mode");
+  } catch (err) {
+    if (err instanceof BadRequestError) throw err;
+    throw new BadRequestError("Malformed cursor");
+  }
+};
+const getSortMode = (functionName: string, hasTextQuery: boolean): CursorMode=>{
+  if (functionName === "search_churches_by_radius" || functionName === "search_churches_by_bbox") return "dist";
+  if (hasTextQuery && functionName === "search_churches") return "rank";
+  return "id";
+};
+const rowToCursorPayload = (mode: CursorMode, row: Record<string, unknown>): CursorPayload | null=>{
+  const id = typeof row?.church_id === "string" ? row.church_id : null;
+  if (!id) return null;
+  if (mode === "rank") {
+    const rank = typeof row?.rank === "number" ? row.rank : null;
+    if (rank === null) return null;
+    return {
+      mode: "rank",
+      rank,
+      id
+    };
+  }
+  if (mode === "dist") {
+    const dist = typeof row?.distance_m === "number" ? row.distance_m : null;
+    if (dist === null) return null;
+    return {
+      mode: "dist",
+      dist,
+      id
+    };
+  }
+  return {
+    mode: "id",
+    id
+  };
+};
 serve(async (req)=>{
   // 🔐 Zuplo↔Supabase handshake
   const apiKey = req.headers.get("apikey");
@@ -147,8 +247,13 @@ serve(async (req)=>{
     const p_postal_code = qp.get("postal_code");
     const equals_id = qp.get("id");
     const limitRaw = parseNum(qp, "limit");
-    // Align with updated OpenAPI (max 10,000). Keep 25 as default to avoid huge payloads when caller omits limit.
-    const p_limit = Math.max(1, Math.min(limitRaw ?? 25, 10_000));
+    const limit = Math.max(1, Math.min(limitRaw ?? 20, 100));
+    const rpcLimit = limit + 1; // over-fetch to detect has_more
+    const cursorRaw = qp.get("cursor");
+    const cursorPayload = cursorRaw ? decodeCursor(cursorRaw) : null; // validated opaque cursor
+    // Legacy params keep working but cursor takes priority if present.
+    qp.get("offset");
+    qp.get("page");
     // Multi-select
     const p_languages = parseList(qp, "languages");
     const p_programs = parseList(qp, "programs");
@@ -200,11 +305,13 @@ serve(async (req)=>{
       p_region,
       p_locality,
       p_postal_code,
-      p_limit
+      p_limit: rpcLimit
     };
     if (forGlobe) {
       functionName = "churches_for_globe";
-      rpcArgs = { p_limit };
+      rpcArgs = {
+        p_limit: rpcLimit
+      };
     } else if (radiusProvided) {
       functionName = "search_churches_by_radius";
       rpcArgs = {
@@ -236,6 +343,35 @@ serve(async (req)=>{
       };
     }
     // ---------- Call RPC ----------
+    const sortMode = getSortMode(functionName, Boolean(q));
+    if (cursorPayload && cursorPayload.mode !== sortMode) {
+      throw new BadRequestError("Cursor does not match the current sort order");
+    }
+    const cursorArgs = (()=>{
+      if (!cursorPayload) return {};
+      if (cursorPayload.mode === "rank") {
+        // Keyset: honor text search order (rank DESC, church_id ASC)
+        return {
+          p_cursor_rank: cursorPayload.rank,
+          p_cursor_church_id: cursorPayload.id
+        };
+      }
+      if (cursorPayload.mode === "dist") {
+        // Keyset: advance past last distance bucket (distance ASC, church_id ASC)
+        return {
+          p_cursor_distance_m: cursorPayload.dist,
+          p_cursor_church_id: cursorPayload.id
+        };
+      }
+      // Keyset: default to primary key ordering only
+      return {
+        p_cursor_church_id: cursorPayload.id
+      };
+    })();
+    rpcArgs = {
+      ...rpcArgs,
+      ...cursorArgs
+    };
     const { data, error } = await supabase.schema("api").rpc(functionName, rpcArgs);
     if (error) return json({
       error: error.message
@@ -256,13 +392,37 @@ serve(async (req)=>{
       const projFields = needCoords ? Array.from(new Set([...fields, "latitude", "longitude"])) : fields;
       items = items.map((row) => pick(row, projFields));
     }
+    const results = Array.isArray(items) ? items : [];
+    const hasMore = results.length > limit;
+    const pagedItems = results.slice(0, limit);
+    let nextCursor: string | null = null;
+    if (hasMore && pagedItems.length) {
+      const payload = rowToCursorPayload(sortMode, pagedItems[pagedItems.length - 1]);
+      if (!payload) {
+        throw new Error("Unable to build cursor for next page");
+      }
+      nextCursor = encodeCursor(payload);
+    }
+    const paginationHeaders: Record<string, string> = {
+      "X-Limit": String(limit),
+      "X-Has-More": hasMore ? "true" : "false"
+    };
+    if (nextCursor) paginationHeaders["X-Next-Cursor"] = nextCursor;
     if (format === "geojson") {
-      return json(toGeoJSON(items, fields ?? undefined), 200);
+      return json(toGeoJSON(pagedItems, fields ?? undefined), 200, paginationHeaders);
     }
     return json({
-      items
-    }, 200);
+      items: pagedItems,
+      limit,
+      has_more: hasMore,
+      next_cursor: nextCursor
+    }, 200, paginationHeaders);
   } catch (e) {
+    if (e instanceof BadRequestError) {
+      return json({
+        error: e.message
+      }, e.status);
+    }
     return json({
       error: String(e)
     }, 500);
