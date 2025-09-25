@@ -1,6 +1,6 @@
 // supabase/functions/churches-search/index.ts
 // VERY IMPORTANT: THIS IS FOR REFERENCE ONLY. The actual implementation of this edge function is in Supabase.
-// Last synced: 2025-09-08
+// Last synced: 2025-09-24
 // This edge function routes to the correct RPC based on query params.
 
 
@@ -33,6 +33,7 @@ const supabase = createClient(supabaseUrl, serviceKey, {
   "postal_code",
   "country",
   "website",
+  "logo_url",
   "phone",
   "created_at",
   "updated_at",
@@ -72,6 +73,7 @@ const DEFAULT_FIELDS = [
   "region",
   "country",
   "website",
+  "logo_url",
   "url_beliefs",
   "url_giving",
   "url_live",
@@ -204,8 +206,14 @@ const rowToCursorPayload = (mode: CursorMode, row: Record<string, unknown>): Cur
   const id = typeof row?.church_id === "string" ? row.church_id : null;
   if (!id) return null;
   if (mode === "rank") {
-    const rank = typeof row?.rank === "number" ? row.rank : null;
-    if (rank === null) return null;
+    const rawRank = row?.rank;
+    const rank = typeof rawRank === "number" ? rawRank : typeof rawRank === "string" ? Number(rawRank) : null;
+    if (rank === null || Number.isNaN(rank)) {
+      return {
+        mode: "id",
+        id
+      };
+    }
     return {
       mode: "rank",
       rank,
@@ -213,8 +221,14 @@ const rowToCursorPayload = (mode: CursorMode, row: Record<string, unknown>): Cur
     };
   }
   if (mode === "dist") {
-    const dist = typeof row?.distance_m === "number" ? row.distance_m : null;
-    if (dist === null) return null;
+    const rawDist = row?.distance_m;
+    const dist = typeof rawDist === "number" ? rawDist : typeof rawDist === "string" ? Number(rawDist) : null;
+    if (dist === null || Number.isNaN(dist)) {
+      return {
+        mode: "id",
+        id
+      };
+    }
     return {
       mode: "dist",
       dist,
@@ -345,7 +359,10 @@ serve(async (req)=>{
     // ---------- Call RPC ----------
     const sortMode = getSortMode(functionName, Boolean(q));
     if (cursorPayload && cursorPayload.mode !== sortMode) {
-      throw new BadRequestError("Cursor does not match the current sort order");
+      const allowsIdFallback = (sortMode === "rank" || sortMode === "dist") && cursorPayload.mode === "id";
+      if (!allowsIdFallback) {
+        throw new BadRequestError("Cursor does not match the current sort order");
+      }
     }
     const cursorArgs = (()=>{
       if (!cursorPayload) return {};
@@ -377,27 +394,30 @@ serve(async (req)=>{
       error: error.message
     }, 400);
     // ---------- Field projection & formatting ----------
-    let items = data ?? [];
+    const rawItems = (Array.isArray(data) ? data : []) as Record<string, unknown>[];
     // Back-compat: if caller only provided singular params, filter client-side to be forgiving.
     // (The RPC already handles arrays; this is just a small UX nicety.)
-    if (p_language && Array.isArray(items)) {
-      items = items.filter((r)=>Array.isArray(r?.service_languages) ? r.service_languages?.some((v)=>(v || "").toLowerCase() === p_language.toLowerCase()) : true);
+    let filteredItems = rawItems;
+    if (p_language) {
+      filteredItems = filteredItems.filter((r)=>Array.isArray(r?.service_languages) ? r.service_languages?.some((v)=>(v || "").toLowerCase() === p_language.toLowerCase()) : true);
     }
-    if (p_program && Array.isArray(items)) {
-      items = items.filter((r)=>Array.isArray(r?.ministry_names) ? r.ministry_names?.some((v)=>v?.toLowerCase().includes(p_program.toLowerCase())) : true);
+    if (p_program) {
+      filteredItems = filteredItems.filter((r)=>Array.isArray(r?.ministry_names) ? r.ministry_names?.some((v)=>v?.toLowerCase().includes(p_program.toLowerCase())) : true);
     }
+    let projectedItems: Record<string, unknown>[] = filteredItems;
     if (fields?.length) {
       // Ensure GeoJSON has coordinates even if caller omitted them
       const needCoords = format === "geojson" && (!fields.includes("latitude") || !fields.includes("longitude"));
       const projFields = needCoords ? Array.from(new Set([...fields, "latitude", "longitude"])) : fields;
-      items = items.map((row) => pick(row, projFields));
+      projectedItems = filteredItems.map((row) => pick(row, projFields));
     }
-    const results = Array.isArray(items) ? items : [];
-    const hasMore = results.length > limit;
-    const pagedItems = results.slice(0, limit);
+    const pageSourceRows = filteredItems.slice(0, limit);
+    const hasMore = filteredItems.length > limit;
+    const pagedItems = projectedItems.slice(0, limit);
     let nextCursor: string | null = null;
-    if (hasMore && pagedItems.length) {
-      const payload = rowToCursorPayload(sortMode, pagedItems[pagedItems.length - 1]);
+    if (hasMore && pageSourceRows.length) {
+      const cursorSourceRow = pageSourceRows[pageSourceRows.length - 1];
+      const payload = rowToCursorPayload(sortMode, cursorSourceRow);
       if (!payload) {
         throw new Error("Unable to build cursor for next page");
       }

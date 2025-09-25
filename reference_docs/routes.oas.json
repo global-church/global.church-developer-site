@@ -379,6 +379,7 @@
           "postal_code": { "type": "string", "nullable": true },
           "country": { "type": "string" },
           "website": { "type": "string", "nullable": true },
+          "logo_url": { "type": "string", "nullable": true },
           "phone": { "type": "string", "nullable": true },
           "created_at": { "type": "string", "format": "date-time" },
           "updated_at": { "type": "string", "format": "date-time" },
