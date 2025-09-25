@@ -1,6 +1,6 @@
 // supabase/functions/churches-search/index.ts
 // VERY IMPORTANT: THIS IS FOR REFERENCE ONLY. The actual implementation of this edge function is in Supabase.
-// Last synced: 2025-09-24
+// Last synced: 2025-09-25
 
 // This edge function routes to the correct RPC based on query params.
 
@@ -71,21 +71,6 @@ const supabase = createClient(supabaseUrl, serviceKey, {
   // The radius RPC also returns "distance_m"; include it here for projection if present.
   "distance_m"
 ]);
-/** Default lean projection for list/search – MUST include church_id for linking. */ const DEFAULT_FIELDS = [
-  "church_id",
-  "name",
-  "address",
-  "locality",
-  "region",
-  "country",
-  "website",
-  "logo_url",
-  "url_beliefs",
-  "url_giving",
-  "url_live",
-  "latitude",
-  "longitude"
-];
 /** Small helpers */ const pick = (obj, keys)=>{
   const out = {};
   for (const k of keys)if (k in obj) out[k] = obj[k];
@@ -190,10 +175,8 @@ serve(async (req)=>{
       if (!fields.includes("church_id")) fields.push("church_id");
       if (fields.length === 0) fields = null; // fall back if nothing valid
     } else {
-      // No explicit projection requested: return a lean, helpful set with key links
-      fields = [
-        ...DEFAULT_FIELDS
-      ];
+      // No explicit projection requested: return the full record payload
+      fields = null;
     }
     const format = (qp.get("format") || "json").toLowerCase(); // "json" | "geojson"
     const forGlobe = parseBool(qp, "for_globe") === true;
