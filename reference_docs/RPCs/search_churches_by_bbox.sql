@@ -57,7 +57,8 @@ RETURNS TABLE (
   overarching_name      TEXT,
   is_multi_campus       BOOLEAN,
   distance_m            DOUBLE PRECISION,
-  logo_url              TEXT
+  logo_url              TEXT,
+  banner_url            TEXT
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -99,7 +100,8 @@ BEGIN
     b.belief_type, b.denomination, b.trinitarian, b.extraction_confidence, b.church_summary,
     b.is_weekly_church, b.campus_name, b.overarching_name, b.is_multi_campus,
     b.dist_m::DOUBLE PRECISION AS distance_m,
-    b.logo_url
+    b.logo_url,
+    b.banner_url
   FROM v AS b
   WHERE
     (p_country     IS NULL OR b.country            = p_country)

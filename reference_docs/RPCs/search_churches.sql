@@ -54,6 +54,7 @@ RETURNS TABLE (
   overarching_name      TEXT,
   is_multi_campus       BOOLEAN,
   logo_url              TEXT,
+  banner_url            TEXT,
   rank                  DOUBLE PRECISION
 )
 LANGUAGE plpgsql
@@ -109,6 +110,7 @@ BEGIN
     f.belief_type, f.denomination, f.trinitarian, f.extraction_confidence, f.church_summary,
     f.is_weekly_church, f.campus_name, f.overarching_name, f.is_multi_campus,
     f.logo_url,
+    f.banner_url,
     f.search_rank AS rank
   FROM filtered AS f
   WHERE
