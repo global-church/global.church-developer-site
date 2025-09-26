@@ -22,6 +22,8 @@ import { formatLanguages, normalizeLanguagesToCodes } from "@/lib/languages";
 // Service time helpers (module scope for stable identities)
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'] as const;
 const DAY_ABBR = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as const;
+const ALL_BELIEFS = ['protestant','roman_catholic','orthodox','anglican','other'] as const;
+const DEFAULT_PAGE_SIZE = 100;
 const minutesToDayIndex = (m: number) => Math.max(0, Math.min(6, Math.floor(m / 1440)));
 const minutesToTimeString = (m: number) => {
   const mins = ((m % 1440) + 1440) % 1440;
@@ -64,21 +66,69 @@ const inTimeRange = (minuteOfDay: number, start?: number, end?: number): boolean
   return true;
 };
 
+type ExplorerFilters = {
+  belief?: string | string[];
+  languages?: string[];
+  service_days?: string[];
+  service_time_start?: string;
+  service_time_end?: string;
+  programs?: string[];
+};
+
 export default function ExplorerClient() {
   const [searchMode, setSearchMode] = useState<'initial' | 'nearby'>('initial');
   const [nearbyResults, setNearbyResults] = useState<NearbyChurch[]>([]);
   const [serverResults, setServerResults] = useState<ChurchPublic[]>([]);
+  const [serverMeta, setServerMeta] = useState<{ hasMore: boolean; nextCursor: string | null }>({ hasMore: false, nextCursor: null });
+  const [nearbyMeta, setNearbyMeta] = useState<{ hasMore: boolean; nextCursor: string | null }>({ hasMore: false, nextCursor: null });
   const baseResults: ChurchPublic[] = useMemo(
     () => (searchMode === 'nearby' ? [] : serverResults),
     [searchMode, serverResults]
   );
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [radiusKm, setRadiusKm] = useState(25);
   const [unit, setUnit] = useState<"km" | "mi">("km");
   const sp = useSearchParams();
+  const spKey = sp.toString();
   const [fitKey, setFitKey] = useState(0);
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number; accuracy: number; isHighAccuracy: boolean } | null>(null);
+  const skipNearbyFetchRef = useRef(false);
+
+  const filters = useMemo<ExplorerFilters>(() => {
+    const params = new URLSearchParams(spKey);
+
+    const rawBelief = params.get('belief') || '';
+    const beliefParts = rawBelief.split(',').map((s) => s.trim()).filter(Boolean);
+    const belief: string | string[] | undefined =
+      beliefParts.length === 0 || beliefParts.length === ALL_BELIEFS.length
+        ? undefined
+        : (beliefParts.length === 1 ? beliefParts[0] : beliefParts);
+
+    const languageCsv = params.get('language') || '';
+    const uiLanguages = languageCsv ? languageCsv.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+    const languages = normalizeLanguagesToCodes(uiLanguages);
+
+    const serviceDayCsv = params.get('service_days') || '';
+    const service_days = serviceDayCsv ? serviceDayCsv.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+    const service_time_start = params.get('service_time_start') || undefined;
+    const service_time_end = params.get('service_time_end') || undefined;
+
+    const programsStr = params.get('programs') || '';
+    const programs = programsStr
+      ? programsStr.split(',').map((s) => s.trim()).filter(Boolean)
+      : undefined;
+
+    return {
+      belief,
+      languages,
+      service_days,
+      service_time_start,
+      service_time_end,
+      programs,
+    } satisfies ExplorerFilters;
+  }, [spKey]);
 
   // Haversine distance (km) for robust client-side distance display
   const distanceKm = useCallback((
@@ -99,66 +149,82 @@ export default function ExplorerClient() {
     return R * c;
   }, []);
 
-  // Fetch from backend when URL params change
+  // Fetch paginated results when filters change (standard mode)
   useEffect(() => {
-    let isActive = true;
-    async function load() {
-      setLoading(true);
-      try {
-        const rawBelief = sp.get('belief') || '';
-        const beliefParts = rawBelief.split(',').map((s) => s.trim()).filter(Boolean);
-        const ALL_BELIEFS = ['protestant','roman_catholic','orthodox','anglican','other'] as const;
-        const belief: string | string[] | undefined = beliefParts.length === 0 || beliefParts.length === ALL_BELIEFS.length
-          ? undefined
-          : (beliefParts.length === 1 ? beliefParts[0] : beliefParts);
-        const languageCsv = sp.get('language') || '';
-        const uiLanguages = languageCsv ? languageCsv.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
-        const languages = normalizeLanguagesToCodes(uiLanguages);
-        const serviceDayCsv = sp.get('service_days') || '';
-        const service_days = serviceDayCsv ? serviceDayCsv.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
-        const service_time_start = sp.get('service_time_start') || undefined;
-        const service_time_end = sp.get('service_time_end') || undefined;
-        const programsStr = sp.get('programs') || '';
-        const programs = programsStr ? [programsStr] : undefined;
+    if (searchMode === 'nearby') return;
+    let cancelled = false;
+    setLoading(true);
+    setServerResults([]);
+    setServerMeta({ hasMore: false, nextCursor: null });
 
-        if (searchMode === 'nearby' && userLocation) {
-          // In nearby mode, refetch radius results when filters change
-          const radiusForRpcKm = unit === "km" ? radiusKm : radiusKm * 1.60934;
-          const data = await fetchNearbyChurches(
-            userLocation.lat,
-            userLocation.lng,
-            radiusForRpcKm,
-            10000,
-            { belief, languages, service_days, service_time_start, service_time_end, programs }
-          );
-          if (!isActive) return;
-          // Recompute distances client-side to avoid any unit mismatches from backend
-          const recomputed = (data || []).map((r) => ({
-            ...r,
-            distance_km: distanceKm(userLocation, { lat: r.latitude as number | null, lng: r.longitude as number | null }),
-          }));
-          setNearbyResults(recomputed);
-        } else {
-          const rows = await searchChurches({
-            belief,
-            languages,
-            service_days,
-            service_time_start,
-            service_time_end,
-            programs,
-            limit: 10000,
-          });
-          if (!isActive) return;
-          setServerResults(Array.isArray(rows) ? rows : []);
-          setSearchMode('initial');
+    (async () => {
+      try {
+        const page = await searchChurches({
+          ...filters,
+          limit: DEFAULT_PAGE_SIZE,
+        });
+        if (cancelled) return;
+        setServerResults(Array.isArray(page.items) ? page.items : []);
+        setServerMeta({ hasMore: page.hasMore, nextCursor: page.nextCursor });
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Search fetch failed:', err);
+          setServerResults([]);
+          setServerMeta({ hasMore: false, nextCursor: null });
         }
       } finally {
-        if (isActive) setLoading(false);
+        if (!cancelled) setLoading(false);
       }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filters, searchMode]);
+
+  // Refetch nearby results when filters or location change while in nearby mode
+  useEffect(() => {
+    if (searchMode !== 'nearby' || !userLocation) return;
+    if (skipNearbyFetchRef.current) {
+      skipNearbyFetchRef.current = false;
+      return;
     }
-    load();
-    return () => { isActive = false };
-  }, [sp, searchMode, userLocation, radiusKm, unit]);
+    let cancelled = false;
+    setLoading(true);
+    setNearbyMeta({ hasMore: false, nextCursor: null });
+
+    (async () => {
+      try {
+        const radiusForRpcKm = unit === "km" ? radiusKm : radiusKm * 1.60934;
+        const page = await fetchNearbyChurches(
+          userLocation.lat,
+          userLocation.lng,
+          radiusForRpcKm,
+          DEFAULT_PAGE_SIZE,
+          filters,
+        );
+        if (cancelled) return;
+        const recomputed = page.items.map((r) => ({
+          ...r,
+          distance_km: distanceKm(userLocation, { lat: r.latitude as number | null, lng: r.longitude as number | null }),
+        }));
+        setNearbyResults(recomputed);
+        setNearbyMeta({ hasMore: page.hasMore, nextCursor: page.nextCursor });
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Nearby fetch failed:', err);
+          setNearbyResults([]);
+          setNearbyMeta({ hasMore: false, nextCursor: null });
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filters, searchMode, userLocation, radiusKm, unit, distanceKm]);
 
   const onLocated = useCallback(
     async ({ lat, lng, accuracy, isHighAccuracy }: { lat: number; lng: number; accuracy: number; isHighAccuracy: boolean }) => {
@@ -166,41 +232,18 @@ export default function ExplorerClient() {
       setLoading(true);
       try {
         const radiusForRpcKm = unit === "km" ? radiusKm : radiusKm * 1.60934;
-        // Pull current filters from URL
-        const rawBelief = sp.get('belief') || '';
-        const beliefParts = rawBelief.split(',').map((s) => s.trim()).filter(Boolean);
-        const ALL_BELIEFS = ['protestant','roman_catholic','orthodox','anglican','other'] as const;
-        const belief: string | string[] | undefined = beliefParts.length === 0 || beliefParts.length === ALL_BELIEFS.length
-          ? undefined
-          : (beliefParts.length === 1 ? beliefParts[0] : beliefParts);
-        const languageCsv = sp.get('language') || '';
-        const uiLanguages = languageCsv ? languageCsv.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
-        const languages = normalizeLanguagesToCodes(uiLanguages);
-        const serviceDayCsv = sp.get('service_days') || '';
-        const service_days = serviceDayCsv ? serviceDayCsv.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
-        const service_time_start = sp.get('service_time_start') || undefined;
-        const service_time_end = sp.get('service_time_end') || undefined;
-        const programsStr = sp.get('programs') || '';
-        const programs = programsStr ? [programsStr] : undefined;
-
-        const data = await fetchNearbyChurches(lat, lng, radiusForRpcKm, 10000, {
-          belief,
-          languages,
-          service_days,
-          service_time_start,
-          service_time_end,
-          programs,
-        });
-        // Recompute distances client-side to ensure correct unit handling
-        const arr = (data as unknown as NearbyChurch[]).map((r) => ({
+        const page = await fetchNearbyChurches(lat, lng, radiusForRpcKm, DEFAULT_PAGE_SIZE, filters);
+        const recomputed = page.items.map((r) => ({
           ...r,
           distance_km: distanceKm({ lat, lng }, { lat: r.latitude as number | null, lng: r.longitude as number | null }),
         }));
-        setNearbyResults(arr);
+        setNearbyResults(recomputed);
+        setNearbyMeta({ hasMore: page.hasMore, nextCursor: page.nextCursor });
+        skipNearbyFetchRef.current = true;
         setSearchMode('nearby');
         try {
           sessionStorage.setItem('cf_search_mode', 'nearby');
-          sessionStorage.setItem('cf_nearby_results', JSON.stringify(arr));
+          sessionStorage.setItem('cf_nearby_results', JSON.stringify(recomputed));
         } catch {}
       } catch (e: unknown) {
         const msg = (e instanceof Error && e.message) ? e.message : String(e);
@@ -214,7 +257,7 @@ export default function ExplorerClient() {
         setLoading(false);
       }
     },
-    [radiusKm, unit, sp]
+    [radiusKm, unit, filters, distanceKm]
   );
 
   // Restore mode and results after remounts due to URL param changes
@@ -227,6 +270,7 @@ export default function ExplorerClient() {
           const arr = JSON.parse(raw) as NearbyChurch[];
           setNearbyResults(arr);
           setSearchMode('nearby');
+          setNearbyMeta({ hasMore: false, nextCursor: null });
         }
       }
     } catch {}
@@ -257,7 +301,6 @@ const formatDenomination = (denom?: string | null) => {
     .join(' ');
 };
 
-  const spKey = sp.toString();
   const resultsKey = useMemo(() => {
     const list = searchMode === 'nearby' ? nearbyResults : serverResults;
     const n = list.length
@@ -289,6 +332,54 @@ const formatDenomination = (denom?: string | null) => {
       belief_type: (r.belief_type as NearbyChurch['belief_type']) ?? null,
     }));
   }, [baseResults, nearbyResults, searchMode]);
+
+  const handleLoadMore = useCallback(async () => {
+    if (searchMode === 'nearby') {
+      if (!nearbyMeta.hasMore || !nearbyMeta.nextCursor || !userLocation) return;
+      setLoadingMore(true);
+      try {
+        const radiusForRpcKm = unit === "km" ? radiusKm : radiusKm * 1.60934;
+        const page = await fetchNearbyChurches(
+          userLocation.lat,
+          userLocation.lng,
+          radiusForRpcKm,
+          DEFAULT_PAGE_SIZE,
+          filters,
+          nearbyMeta.nextCursor,
+        );
+        const recomputed = page.items.map((r) => ({
+          ...r,
+          distance_km: distanceKm(userLocation, { lat: r.latitude as number | null, lng: r.longitude as number | null }),
+        }));
+        setNearbyResults((prev) => [...prev, ...recomputed]);
+        setNearbyMeta({ hasMore: page.hasMore, nextCursor: page.nextCursor });
+      } catch (err) {
+        console.error('Nearby pagination failed:', err);
+      } finally {
+        setLoadingMore(false);
+      }
+      return;
+    }
+
+    if (!serverMeta.hasMore || !serverMeta.nextCursor) return;
+    setLoadingMore(true);
+    try {
+      const page = await searchChurches({
+        ...filters,
+        limit: DEFAULT_PAGE_SIZE,
+        cursor: serverMeta.nextCursor,
+      });
+      const incoming = Array.isArray(page.items) ? page.items : [];
+      setServerResults((prev) => [...prev, ...incoming]);
+      setServerMeta({ hasMore: page.hasMore, nextCursor: page.nextCursor });
+    } catch (err) {
+      console.error('Search pagination failed:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [searchMode, nearbyMeta, userLocation, unit, radiusKm, filters, distanceKm, serverMeta]);
+
+  const canLoadMore = searchMode === 'nearby' ? nearbyMeta.hasMore : serverMeta.hasMore;
 
   const selectedServiceDays = useMemo(() => {
     const raw = sp.get('service_days') || '';
@@ -469,7 +560,11 @@ const formatDenomination = (denom?: string | null) => {
         {searchMode === 'nearby' && (
           <button
             className="ml-3 text-sm underline text-gray-600 hover:text-gray-800"
-            onClick={() => { setSearchMode('initial'); setNearbyResults([]); }}
+            onClick={() => {
+              setSearchMode('initial');
+              setNearbyResults([]);
+              setNearbyMeta({ hasMore: false, nextCursor: null });
+            }}
           >
             Show All Churches
           </button>
@@ -480,8 +575,9 @@ const formatDenomination = (denom?: string | null) => {
       <div className="h-[420px] w-full rounded-xl overflow-hidden border">
         <ChurchMap pins={mapPins} fitKey={fitKey} disableViewportFetch={true} userLocation={userLocation} />
       </div>
-
-      {/* Removed keyword search bar in favor of advanced filters */}
+      <p className="text-center text-sm italic text-gray-600">
+        Searches are currently limited to 100 results per page because the API proxy and database edge functions enforce cursor-based pagination to keep response payloads reasonable and predictable.
+      </p>
 
       {/* Results list */}
       {(
@@ -679,6 +775,18 @@ const formatDenomination = (denom?: string | null) => {
               );
             })}
           </ul>
+
+          {!loading && canLoadMore && (
+            <div className="flex justify-center pt-2">
+              <Button
+                variant="outline"
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? 'Loading more…' : 'Load more churches'}
+              </Button>
+            </div>
+          )}
 
           {!loading && resultsFiltered.length === 0 && (
             <p className="text-sm text-gray-600 text-center">

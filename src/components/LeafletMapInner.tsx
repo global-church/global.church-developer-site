@@ -417,7 +417,7 @@ export default function LeafletMapInner({
         if (!Number.isFinite(p_min_lng) || !Number.isFinite(p_min_lat) || !Number.isFinite(p_max_lng) || !Number.isFinite(p_max_lat)) {
           return
         }
-        const data = await searchChurchesByBbox({
+        const page = await searchChurchesByBbox({
           min_lng: p_min_lng,
           min_lat: p_min_lat,
           max_lng: p_max_lng,
@@ -427,7 +427,7 @@ export default function LeafletMapInner({
         // Guard against stale responses
         if (reqId !== requestIdRef.current) return
 
-        const rows = (data ?? []) as Array<{
+        const rows = (Array.isArray(page.items) ? page.items : []) as Array<{
           church_id: string
           name: string
           latitude: number | null

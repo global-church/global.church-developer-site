@@ -1,6 +1,7 @@
 // src/lib/nearMe.ts
 import { searchChurchesByRadius } from "@/lib/zuplo";
 import type { ChurchWithinRadiusRow } from "@/lib/types";
+import type { ZuploListResponse } from "@/lib/zuplo";
 
 export type NearbyChurch = {
   church_id: string;
@@ -26,7 +27,7 @@ export async function fetchNearbyChurches(
   lat: number,
   lng: number,
   radiusKm = 25,
-  maxResults = 10000,
+  pageSize = 50,
   filters?: {
     belief?: string | string[];
     languages?: string[];
@@ -34,24 +35,33 @@ export async function fetchNearbyChurches(
     service_time_start?: string;
     service_time_end?: string;
     programs?: string[];
-  }
-): Promise<NearbyChurch[]> {
-  const results = await searchChurchesByRadius({
+  },
+  cursor?: string
+): Promise<ZuploListResponse<NearbyChurch>> {
+  const page = await searchChurchesByRadius({
     center_lat: lat,
     center_lng: lng,
     radius_km: radiusKm,
-    limit: maxResults,
+    limit: pageSize,
     belief: filters?.belief,
     languages: filters?.languages,
     service_days: filters?.service_days,
     service_time_start: filters?.service_time_start,
     service_time_end: filters?.service_time_end,
     programs: filters?.programs,
+    cursor,
   });
 
-  const rows = results as Array<ChurchWithinRadiusRow>;
-  return rows.map((church) => ({
+  const rows = page.items as Array<ChurchWithinRadiusRow>;
+  const items = rows.map((church) => ({
     ...church,
     distance_km: typeof church.distance_m === 'number' ? church.distance_m / 1000 : 0,
   })) as unknown as NearbyChurch[];
+
+  return {
+    items,
+    limit: page.limit,
+    hasMore: page.hasMore,
+    nextCursor: page.nextCursor,
+  };
 }

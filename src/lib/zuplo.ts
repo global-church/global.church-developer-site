@@ -5,14 +5,74 @@ import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 const ZUPLO_API_URL = process.env.NEXT_PUBLIC_ZUPLO_API_URL;
 const ZUPLO_API_KEY = process.env.NEXT_PUBLIC_ZUPLO_API_KEY;
 
-if (!ZUPLO_API_URL || !ZUPLO_API_KEY) {
-  throw new Error('Zuplo API URL or Key is not defined in environment variables.');
+export type ZuploListResponse<T> = {
+  items: T[];
+  limit: number;
+  hasMore: boolean;
+  nextCursor: string | null;
+};
+
+function getZuploConfig(): { baseUrl: string; apiKey: string } {
+  if (!ZUPLO_API_URL || !ZUPLO_API_KEY) {
+    const urlStatus = ZUPLO_API_URL ? 'set' : 'unset';
+    const keyStatus = ZUPLO_API_KEY ? 'set' : 'unset';
+    throw new Error(
+      `Zuplo API URL or Key is not defined. Set NEXT_PUBLIC_ZUPLO_API_URL and NEXT_PUBLIC_ZUPLO_API_KEY in .env.local (see .env.example). ` +
+      `(url: ${urlStatus}, key: ${keyStatus})`
+    );
+  }
+  return { baseUrl: ZUPLO_API_URL, apiKey: ZUPLO_API_KEY };
+}
+
+function normaliseListResponse<T>(payload: unknown): ZuploListResponse<T> {
+  if (Array.isArray(payload)) {
+    const items = payload as T[];
+    return {
+      items,
+      limit: items.length,
+      hasMore: false,
+      nextCursor: null,
+    };
+  }
+
+  if (payload && typeof payload === 'object' && 'items' in payload) {
+    const obj = payload as {
+      items?: unknown;
+      limit?: unknown;
+      has_more?: unknown;
+      hasMore?: unknown;
+      next_cursor?: unknown;
+      nextCursor?: unknown;
+    };
+    const items = Array.isArray(obj.items) ? (obj.items as T[]) : [];
+    const limit = typeof obj.limit === 'number' ? obj.limit : items.length;
+    const hasMoreRaw =
+      typeof obj.has_more === 'boolean' ? obj.has_more :
+      (typeof obj.hasMore === 'boolean' ? obj.hasMore : false);
+    const nextCursorRaw =
+      typeof obj.next_cursor === 'string' ? obj.next_cursor :
+      (typeof obj.nextCursor === 'string' ? obj.nextCursor : null);
+    return {
+      items,
+      limit,
+      hasMore: Boolean(hasMoreRaw),
+      nextCursor: nextCursorRaw && nextCursorRaw.length > 0 ? nextCursorRaw : null,
+    };
+  }
+
+  return {
+    items: [],
+    limit: 0,
+    hasMore: false,
+    nextCursor: null,
+  };
 }
 
 // A generic fetch function to handle calls to our Zuplo API
-async function fetchFromZuploAPI<T>(params: Record<string, unknown>): Promise<T> {
+async function fetchFromZuploAPI<T>(params: Record<string, unknown>): Promise<ZuploListResponse<T>> {
+  const { baseUrl, apiKey } = getZuploConfig();
   // All church search routes are served behind /v1/churches/search with query params
-  const url = new URL(`${ZUPLO_API_URL}/v1/churches/search`);
+  const url = new URL(`${baseUrl}/v1/churches/search`);
 
   // Append non-null parameters to the URL
   Object.entries(params).forEach(([key, value]) => {
@@ -27,7 +87,7 @@ async function fetchFromZuploAPI<T>(params: Record<string, unknown>): Promise<T>
   });
 
   const headers: HeadersInit = {
-    Authorization: `Bearer ${ZUPLO_API_KEY}`,
+    Authorization: `Bearer ${apiKey}`,
   };
 
   const requestUrl = url.toString();
@@ -47,7 +107,7 @@ async function fetchFromZuploAPI<T>(params: Record<string, unknown>): Promise<T>
   }
 
   const data = await response.json();
-  return data.items as T;
+  return normaliseListResponse<T>(data);
 }
 
 
@@ -68,7 +128,8 @@ export async function searchChurches(params: {
   id?: string;
   limit?: number;
   fields?: string;
-}): Promise<ChurchPublic[]> {
+  cursor?: string;
+}): Promise<ZuploListResponse<ChurchPublic>> {
   // Ensure church_id is returned for linking when caller didn't specify fields
   const next: Record<string, unknown> = { ...params };
   if (!('fields' in next)) {
@@ -83,14 +144,15 @@ export async function searchChurches(params: {
   if (hasNoFilters && !('for_globe' in next)) {
     next.for_globe = true;
   }
-  return fetchFromZuploAPI<ChurchPublic[]>(next);
+  return fetchFromZuploAPI<ChurchPublic>(next);
 }
 
 // Fetch a single church by id using the dedicated endpoint
 export async function getChurchById(id: string): Promise<ChurchPublic | null> {
   if (!id) return null;
-  const url = new URL(`${ZUPLO_API_URL}/v1/churches/${id}`);
-  const headers: HeadersInit = { Authorization: `Bearer ${ZUPLO_API_KEY}` };
+  const { baseUrl, apiKey } = getZuploConfig();
+  const url = new URL(`${baseUrl}/v1/churches/${id}`);
+  const headers: HeadersInit = { Authorization: `Bearer ${apiKey}` };
   const res = await fetch(url.toString(), { headers });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
@@ -118,14 +180,15 @@ export async function searchChurchesByBbox(params: {
   service_time_start?: string;
   service_time_end?: string;
   limit?: number;
-}): Promise<ChurchPublic[]> {
+  cursor?: string;
+}): Promise<ZuploListResponse<ChurchPublic>> {
   const next: Record<string, unknown> = { ...params };
   if (!('fields' in next)) {
     next.fields = 'church_id,name,latitude,longitude,locality,region,country,website,belief_type,denomination,ministry_names,service_languages,service_times,geojson';
   } else if (typeof next.fields === 'string' && !String(next.fields).split(',').map(s => s.trim()).includes('church_id')) {
     next.fields = String(next.fields) + ',church_id';
   }
-  return fetchFromZuploAPI<ChurchPublic[]>(next);
+  return fetchFromZuploAPI<ChurchPublic>(next);
 }
 
 
@@ -147,14 +210,15 @@ export async function searchChurchesByRadius(params: {
   service_time_start?: string;
   service_time_end?: string;
   limit?: number;
-}): Promise<ChurchWithinRadiusRow[]> {
+  cursor?: string;
+}): Promise<ZuploListResponse<ChurchWithinRadiusRow>> {
   const next: Record<string, unknown> = { ...params };
   if (!('fields' in next)) {
     next.fields = 'church_id,name,latitude,longitude,locality,region,country,website,belief_type,denomination,ministry_names,service_languages,service_times,geojson,distance_m';
   } else if (typeof next.fields === 'string' && !String(next.fields).split(',').map(s => s.trim()).includes('church_id')) {
     next.fields = String(next.fields) + ',church_id';
   }
-  return fetchFromZuploAPI<ChurchWithinRadiusRow[]>(next);
+  return fetchFromZuploAPI<ChurchWithinRadiusRow>(next);
 }
 
 /**
@@ -183,9 +247,10 @@ export async function searchChurchesGeoJSON(params: {
   center_lng?: number;
   radius_km?: number;
 }): Promise<FeatureCollection<Geometry, GeoJsonProperties>> {
+  const { baseUrl, apiKey } = getZuploConfig();
   // Helper to build URL with params
   const buildUrl = () => {
-    const u = new URL(`${ZUPLO_API_URL}/v1/churches/search`);
+    const u = new URL(`${baseUrl}/v1/churches/search`);
     Object.entries(params).forEach(([key, value]) => {
       if (value !== null && value !== undefined) {
         if (Array.isArray(value)) {
@@ -220,7 +285,7 @@ export async function searchChurchesGeoJSON(params: {
     return u;
   };
 
-  const headers: HeadersInit = { Authorization: `Bearer ${ZUPLO_API_KEY}` };
+  const headers: HeadersInit = { Authorization: `Bearer ${apiKey}` };
 
   // 1) Try server-side GeoJSON first
   try {

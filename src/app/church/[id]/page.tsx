@@ -74,8 +74,9 @@ export default async function ChurchPage(
     fetchError = e instanceof Error ? e.message : String(e)
     // Fallback to legacy search route for resilience while debugging gateway
     try {
-      const rows = await searchChurches({ id, limit: 1, fields: FALLBACK_FIELDS })
-      data = (rows?.[0] as ChurchWithOptionalRoot) || null
+      const page = await searchChurches({ id, limit: 1, fields: FALLBACK_FIELDS })
+      const rows = Array.isArray(page.items) ? page.items : []
+      data = (rows[0] as ChurchWithOptionalRoot) || null
       if (data) source = 'fallback-search'
     } catch {}
   }
