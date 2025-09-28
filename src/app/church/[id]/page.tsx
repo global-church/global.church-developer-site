@@ -9,6 +9,7 @@ import FacebookSection from "@/components/FacebookSection"
 import { formatLanguages } from "@/lib/languages"
 import { ArrowLeft, MoreVertical, MapPin, Instagram, Youtube, Mail, ExternalLink, Phone, Facebook } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 
 export const dynamic = 'force-dynamic'
 
@@ -118,6 +119,30 @@ export default async function ChurchPage(
     ? church.service_languages
     : (church.service_languages ? String(church.service_languages).split(',').map(s => s.trim()).filter(Boolean) : [])
   const languageNames = formatLanguages(languages)
+  const churchInitial = (() => {
+    const raw = church.name ? String(church.name).trim() : ''
+    return raw ? raw.charAt(0).toUpperCase() : 'C'
+  })()
+
+  const logoUrl = (() => {
+    const raw = (church as { logo_url?: string | null }).logo_url ?? null
+    if (!raw) return null
+    const trimmed = raw.trim()
+    if (!trimmed) return null
+    if (/^https?:\/\//i.test(trimmed)) return trimmed
+    if (trimmed.startsWith('//')) return `https:${trimmed}`
+    return `https://${trimmed}`
+  })()
+
+  const bannerUrl = (() => {
+    const raw = (church as { banner_url?: string | null }).banner_url ?? null
+    if (!raw) return null
+    const trimmed = raw.trim()
+    if (!trimmed) return null
+    if (/^https?:\/\//i.test(trimmed)) return trimmed
+    if (trimmed.startsWith('//')) return `https:${trimmed}`
+    return `https://${trimmed}`
+  })()
 
   // Format denomination: snake_case -> Title Case with conventional rules
   const formatDenomination = (input?: string | null): string | null => {
@@ -302,13 +327,44 @@ export default async function ChurchPage(
 
       {/* Church Info */}
       <div className="bg-white px-4 py-6">
+        {bannerUrl && (
+          <div className="relative w-full max-w-4xl mx-auto mb-6 overflow-hidden rounded-2xl border border-gray-200">
+            <Image
+              src={bannerUrl}
+              alt={`${church.name ?? 'Church'} banner`}
+              width={1600}
+              height={600}
+              className="h-48 w-full object-cover sm:h-60"
+              priority={false}
+              sizes="(max-width: 768px) 100vw, 800px"
+              unoptimized
+            />
+          </div>
+        )}
         <div className="text-center mb-6">
-          <div className="size-24 rounded-full bg-gradient-to-br from-teal-200 to-blue-300 grid place-items-center text-3xl font-bold text-slate-800 mx-auto mb-4">
-            {church.name?.charAt(0).toUpperCase() ?? "C"}
+          <div
+            className={logoUrl
+              ? 'mx-auto mb-4 size-24 rounded-full overflow-hidden relative border border-gray-200 bg-white shadow-sm'
+              : 'mx-auto mb-4 size-24 rounded-full overflow-hidden relative bg-gradient-to-br from-teal-200 to-blue-300 grid place-items-center text-3xl font-bold text-slate-800'
+            }
+          >
+            {logoUrl ? (
+              <Image
+                src={logoUrl}
+                alt={`${church.name ?? 'Church'} logo`}
+                fill
+                className="object-contain bg-white"
+                sizes="96px"
+                priority={false}
+                unoptimized
+              />
+            ) : (
+              <span>{churchInitial}</span>
+            )}
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">{church.name}</h2>
           <p className="text-gray-600 leading-relaxed max-w-md mx-auto">
-            {church.church_summary ?? "At this church, we believe in fostering a welcoming community where everyone can find their spiritual home."}
+            {church.church_summary ?? "We weren't able to generate a summary for this church, which means you'll have to go visit to learn more about it! :)"}
           </p>
         </div>
 

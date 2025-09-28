@@ -158,7 +158,33 @@ export async function getChurchById(id: string): Promise<ChurchPublic | null> {
     const body = await res.text().catch(() => '');
     throw new Error(`HTTP ${res.status} from ${url.toString()}: ${body.slice(0, 500)}`);
   }
-  return (await res.json()) as ChurchPublic;
+  const payload = await res.json();
+
+  if (!payload) return null;
+
+  if (Array.isArray(payload)) {
+    return (payload[0] ?? null) as ChurchPublic | null;
+  }
+
+  if (typeof payload === 'object') {
+    const { items, data } = payload as { items?: unknown; data?: unknown };
+
+    if (Array.isArray(items)) {
+      return (items[0] ?? null) as ChurchPublic | null;
+    }
+
+    if (Array.isArray(data)) {
+      return (data[0] ?? null) as ChurchPublic | null;
+    }
+
+    if (data && typeof data === 'object') {
+      return data as ChurchPublic;
+    }
+
+    return payload as ChurchPublic;
+  }
+
+  return null;
 }
 
 // Wrapper for the search_churches_by_bbox RPC

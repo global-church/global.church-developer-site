@@ -66,6 +66,8 @@ export type ChurchPublic = {
   instagram_url: string | null;
   youtube_url: string | null;
   social_media: string[] | null;
+  logo_url?: string | null;
+  banner_url?: string | null;
 
   // contact
   scraped_email: string | null;
