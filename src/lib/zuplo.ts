@@ -132,6 +132,7 @@ export async function searchChurches(params: {
 }): Promise<ZuploListResponse<ChurchPublic>> {
   // Ensure church_id is returned for linking when caller didn't specify fields
   const next: Record<string, unknown> = { ...params };
+  const cursorValue = typeof next.cursor === 'string' && next.cursor.length > 0 ? next.cursor : null;
   if (!('fields' in next)) {
     // Request a minimal but linkable set to reduce payload
     next.fields = 'church_id,name,latitude,longitude,locality,region,country,website,belief_type,denomination,ministry_names,service_languages,service_times,geojson';
@@ -141,8 +142,13 @@ export async function searchChurches(params: {
   // Safety: when no filters are provided, hint backend to use globe-optimized RPC
   // This avoids passing null array args to a stricter RPC implementation in some environments.
   const hasNoFilters = !next.q && !next.country && !next.belief && !next.region && !next.locality && !next.postal_code && !next.languages && !next.programs && !next.id;
-  if (hasNoFilters && !('for_globe' in next)) {
+  if (hasNoFilters && !cursorValue && !('for_globe' in next)) {
     next.for_globe = true;
+  }
+  if (!cursorValue) {
+    delete next.cursor;
+  } else {
+    next.cursor = cursorValue;
   }
   return fetchFromZuploAPI<ChurchPublic>(next);
 }
