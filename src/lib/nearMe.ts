@@ -29,6 +29,7 @@ export async function fetchNearbyChurches(
   radiusKm = 25,
   pageSize = 50,
   filters?: {
+    q?: string;
     belief?: string | string[];
     languages?: string[];
     service_days?: string[];
@@ -44,6 +45,7 @@ export async function fetchNearbyChurches(
     radius_km: radiusKm,
     limit: pageSize,
     belief: filters?.belief,
+    q: filters?.q,
     languages: filters?.languages,
     service_days: filters?.service_days,
     service_time_start: filters?.service_time_start,

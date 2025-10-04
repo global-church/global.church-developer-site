@@ -1,15 +1,16 @@
 // src/components/explorer/ChurchExplorerClient.tsx
 "use client";
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { MapPin, ChevronRight, ChevronDown } from "lucide-react";
+import { MapPin, ChevronRight, ChevronDown, Search, X } from "lucide-react";
 import ChurchMap from "@/components/ChurchMap";
 import BeliefFilterButton from "@/components/BeliefFilterButton";
 import LanguageFilterButton from "@/components/LanguageFilterButton";
 import { NearMeButton } from "@/components/NearMeButton";
 import { fetchNearbyChurches, NearbyChurch } from "@/lib/nearMe";
 import type { ChurchPublic } from "@/lib/types";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import ServiceDayFilter from "@/components/explorer/filters/ServiceDayFilter";
 import ServiceTimeFilter from "./filters/ServiceTimeFilter";
 import DenominationFilter from "./filters/DenominationFilter";
@@ -67,6 +68,7 @@ const inTimeRange = (minuteOfDay: number, start?: number, end?: number): boolean
 };
 
 type ExplorerFilters = {
+  q?: string;
   belief?: string | string[];
   languages?: string[];
   service_days?: string[];
@@ -91,6 +93,18 @@ export default function ExplorerClient() {
   const [unit, setUnit] = useState<"km" | "mi">("km");
   const sp = useSearchParams();
   const spKey = sp.toString();
+  const router = useRouter();
+  const pathname = usePathname();
+  const nameFromParams = useMemo(() => {
+    const params = new URLSearchParams(spKey);
+    return params.get('name') ?? '';
+  }, [spKey]);
+  const [searchValue, setSearchValue] = useState(nameFromParams);
+  const [suggestions, setSuggestions] = useState<ChurchPublic[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const searchBlurTimeoutRef = useRef<number | null>(null);
   const [fitKey, setFitKey] = useState(0);
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number; accuracy: number; isHighAccuracy: boolean } | null>(null);
@@ -110,6 +124,10 @@ export default function ExplorerClient() {
     const uiLanguages = languageCsv ? languageCsv.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
     const languages = normalizeLanguagesToCodes(uiLanguages);
 
+    const rawName = params.get('name') || '';
+    const trimmedName = rawName.trim();
+    const q = trimmedName.length > 0 ? trimmedName : undefined;
+
     const serviceDayCsv = params.get('service_days') || '';
     const service_days = serviceDayCsv ? serviceDayCsv.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
     const service_time_start = params.get('service_time_start') || undefined;
@@ -127,8 +145,63 @@ export default function ExplorerClient() {
       service_time_start,
       service_time_end,
       programs,
+      q,
     } satisfies ExplorerFilters;
   }, [spKey]);
+
+  useEffect(() => {
+    setSearchValue((prev) => (prev === nameFromParams ? prev : nameFromParams));
+  }, [nameFromParams]);
+
+  useEffect(() => {
+    const trimmed = searchValue.trim();
+    const current = nameFromParams.trim();
+    const timer = window.setTimeout(() => {
+      if (trimmed === current) return;
+      const params = new URLSearchParams(spKey);
+      if (trimmed) params.set('name', trimmed);
+      else params.delete('name');
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [nameFromParams, pathname, router, searchValue, spKey]);
+
+  useEffect(() => {
+    const trimmed = searchValue.trim();
+    if (trimmed.length < 2) {
+      setSuggestions([]);
+      setSuggestionsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSuggestionsLoading(true);
+    const timer = window.setTimeout(() => {
+      (async () => {
+        try {
+          const page = await searchChurches({
+            ...filters,
+            q: trimmed,
+            limit: 6,
+            fields: 'church_id,name,locality,region,country',
+          });
+          if (cancelled) return;
+          setSuggestions(Array.isArray(page.items) ? page.items : []);
+        } catch (err) {
+          if (!cancelled) {
+            console.error('Suggestion fetch failed:', err);
+            setSuggestions([]);
+          }
+        } finally {
+          if (!cancelled) setSuggestionsLoading(false);
+        }
+      })();
+    }, 200);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [filters, searchValue]);
 
   // Haversine distance (km) for robust client-side distance display
   const distanceKm = useCallback((
@@ -276,6 +349,12 @@ export default function ExplorerClient() {
     } catch {}
   }, []);
 
+  useEffect(() => () => {
+    if (searchBlurTimeoutRef.current != null) {
+      window.clearTimeout(searchBlurTimeoutRef.current);
+    }
+  }, []);
+
   const formatDistance = (km: number) => {
     if (unit === "km") return `${km.toFixed(1)} km`;
     const miles = km * 0.621371;
@@ -301,6 +380,57 @@ const formatDenomination = (denom?: string | null) => {
     .join(' ');
 };
 
+  const scrollToResult = useCallback((churchId?: string | null) => {
+    if (!churchId) return;
+    if (typeof window === 'undefined') return;
+    requestAnimationFrame(() => {
+      window.setTimeout(() => {
+        document.getElementById(`church-card-${churchId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 200);
+    });
+  }, []);
+
+  const clearSearch = useCallback(() => {
+    if (searchBlurTimeoutRef.current != null) {
+      window.clearTimeout(searchBlurTimeoutRef.current);
+      searchBlurTimeoutRef.current = null;
+    }
+    setSearchValue('');
+    setSuggestions([]);
+    setSuggestionsOpen(false);
+    const params = new URLSearchParams(spKey);
+    params.delete('name');
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+    });
+  }, [pathname, router, spKey]);
+
+  const handleSuggestionSelect = useCallback((suggestion: ChurchPublic) => {
+    if (searchBlurTimeoutRef.current != null) {
+      window.clearTimeout(searchBlurTimeoutRef.current);
+      searchBlurTimeoutRef.current = null;
+    }
+    const name = (suggestion?.name || '').trim();
+    if (!name) return;
+    setSearchValue(name);
+    setSuggestionsOpen(false);
+    if (suggestion?.church_id) {
+      router.push(`/church/${suggestion.church_id}`);
+      return;
+    }
+    const params = new URLSearchParams(spKey);
+    params.set('name', name);
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    requestAnimationFrame(() => {
+      scrollToResult(suggestion?.church_id ?? null);
+    });
+  }, [pathname, router, scrollToResult, spKey]);
+
+  const showSuggestions = suggestionsOpen && searchValue.trim().length >= 2;
+
   const resultsKey = useMemo(() => {
     const list = searchMode === 'nearby' ? nearbyResults : serverResults;
     const n = list.length
@@ -309,6 +439,8 @@ const formatDenomination = (denom?: string | null) => {
     const last = list[n - 1]?.church_id || ''
     return `${n}:${first}:${last}`
   }, [nearbyResults, searchMode, serverResults])
+
+  const activeName = filters.q;
 
   
 
@@ -501,6 +633,98 @@ const formatDenomination = (denom?: string | null) => {
   return (
     <section className="space-y-6">
       {/* Filters row */}
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-full sm:w-[500px]">
+          <div className="relative w-full">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Input
+              ref={searchInputRef}
+              value={searchValue}
+              onChange={(e) => {
+                setSearchValue(e.target.value);
+                if (!suggestionsOpen) setSuggestionsOpen(true);
+              }}
+              onFocus={() => {
+                if (searchBlurTimeoutRef.current != null) {
+                  window.clearTimeout(searchBlurTimeoutRef.current);
+                  searchBlurTimeoutRef.current = null;
+                }
+                setSuggestionsOpen(true);
+              }}
+              onBlur={() => {
+                searchBlurTimeoutRef.current = window.setTimeout(() => {
+                  setSuggestionsOpen(false);
+                }, 120);
+              }}
+              placeholder="Search by church name..."
+              className="h-11 pl-9 pr-9"
+              aria-label="Search churches by name"
+            />
+            {searchValue.trim().length > 0 && (
+              <button
+                type="button"
+                aria-label="Clear search input"
+                className="absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200"
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  clearSearch();
+                }}
+              >
+                <X size={16} />
+              </button>
+            )}
+            {showSuggestions && (
+              <div className="absolute left-0 right-0 top-full z-[1100] mt-2 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+                {suggestionsLoading && (
+                  <div className="px-4 py-2 text-sm text-gray-500">Searching...</div>
+                )}
+                {!suggestionsLoading && suggestions.length === 0 && (
+                  <div className="px-4 py-2 text-sm text-gray-500">No matches yet</div>
+                )}
+                {!suggestionsLoading && suggestions.length > 0 && (
+                  <ul className="max-h-64 overflow-auto py-1" role="listbox">
+                    {suggestions.map((item) => {
+                      const locationLabel = [item.locality, item.region, item.country]
+                        .map((part) => (part ? String(part) : ''))
+                        .filter(Boolean)
+                        .join(', ');
+                      return (
+                        <li key={`suggestion-${item.church_id ?? item.name}`}>
+                          <button
+                            type="button"
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              handleSuggestionSelect(item);
+                            }}
+                            className="flex w-full flex-col gap-0.5 px-4 py-2 text-left hover:bg-gray-50"
+                          >
+                            <span className="text-sm font-medium text-gray-900">{item.name}</span>
+                            {locationLabel && (
+                              <span className="text-xs text-gray-500">{locationLabel}</span>
+                            )}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+        {activeName && (
+          <button
+            type="button"
+            onClick={clearSearch}
+            className="inline-flex h-9 items-center justify-center rounded-full border border-gray-200 bg-gray-50 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
+          >
+            Clear search
+          </button>
+        )}
+      </div>
+
+      <p className="text-sm text-gray-600 text-center">or search to find churches near you:</p>
+
       <div className="flex items-center justify-center gap-3 flex-wrap">
         <BeliefFilterButton />
         <LanguageFilterButton />
@@ -579,11 +803,17 @@ const formatDenomination = (denom?: string | null) => {
         Searches are currently limited to 100 results per page because the API proxy and database edge functions enforce cursor-based pagination to keep response payloads reasonable and predictable.
       </p>
 
+      {activeName && (
+        <p className="text-center text-sm text-gray-600">
+          {loading ? 'Searching...' : `Showing ${resultsFiltered.length} churches matching "${activeName}"`}
+        </p>
+      )}
+
       {/* Results list */}
       {(
         <>
           {loading && (
-            <div className="text-sm text-gray-600 text-center">Loading churches…</div>
+            <div className="text-sm text-gray-600 text-center">Loading churches...</div>
           )}
 
           <ul className="space-y-3">
@@ -609,7 +839,11 @@ const formatDenomination = (denom?: string | null) => {
               }
               // Link to profile when we have an id
               return (
-                <li key={`${r.church_id || 'no-id'}-${idx}`} className="rounded-lg border bg-white">
+                <li
+                  key={`${r.church_id || 'no-id'}-${idx}`}
+                  id={r.church_id ? `church-card-${r.church_id}` : undefined}
+                  className="rounded-lg border bg-white"
+                >
                   {r.church_id ? (
                     <a href={`/church/${r.church_id}`} className="block p-4 group">
                       <div className="flex items-start gap-3">
@@ -783,7 +1017,7 @@ const formatDenomination = (denom?: string | null) => {
                 onClick={handleLoadMore}
                 disabled={loadingMore}
               >
-                {loadingMore ? 'Loading more…' : 'Load more churches'}
+                {loadingMore ? 'Loading more...' : 'Load more churches'}
               </Button>
             </div>
           )}
