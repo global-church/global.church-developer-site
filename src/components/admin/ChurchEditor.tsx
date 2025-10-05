@@ -12,6 +12,7 @@ type Props = {
   onClose: () => void;
   onSaved: (church: ChurchPublic, mode: 'edit' | 'create') => void;
   onError: (message: string) => void;
+  visibleFieldKeys?: Array<keyof ChurchPublic>;
 };
 
 type FieldType =
@@ -285,6 +286,12 @@ const FIELD_SECTIONS: FieldSection[] = [
         attentionValues: ['needs_review'],
       },
       {
+        key: 'admin_notes',
+        label: 'Admin Notes',
+        type: 'textarea',
+        description: 'Private notes only visible within the admin dashboard.',
+      },
+      {
         key: 'belief_type',
         label: 'Belief Type',
         type: 'select',
@@ -308,12 +315,12 @@ const FIELD_SECTIONS: FieldSection[] = [
     title: 'Graphics',
     fields: [
       { key: 'logo_url', label: 'Logo URL', type: 'url', placeholder: 'https://example.com/logo.png' },
-      { key: 'logo_width', label: 'Logo Width', type: 'number' },
-      { key: 'logo_height', label: 'Logo Height', type: 'number' },
+      { key: 'logo_width', label: 'Logo Width (pixels)', type: 'number' },
+      { key: 'logo_height', label: 'Logo Height (pixels)', type: 'number' },
       { key: 'logo_aspect_ratio', label: 'Logo Aspect Ratio', type: 'number' },
       { key: 'banner_url', label: 'Banner URL', type: 'url' },
-      { key: 'banner_width', label: 'Banner Width', type: 'number' },
-      { key: 'banner_height', label: 'Banner Height', type: 'number' },
+      { key: 'banner_width', label: 'Banner Width (pixels)', type: 'number' },
+      { key: 'banner_height', label: 'Banner Height (pixels)', type: 'number' },
       { key: 'banner_aspect_ratio', label: 'Banner Aspect Ratio', type: 'number' },
     ],
   },
@@ -327,7 +334,6 @@ const FIELD_SECTIONS: FieldSection[] = [
       { key: 'country', label: 'Country', type: 'text', required: true, requiresAttention: true },
       { key: 'latitude', label: 'Latitude', type: 'number', requiresAttention: true },
       { key: 'longitude', label: 'Longitude', type: 'number', requiresAttention: true },
-      { key: 'geo', label: 'Geo (raw)', type: 'textarea' },
     ],
   },
   {
@@ -544,12 +550,37 @@ function buildUpdates(
   return { updates, errors };
 }
 
-export function ChurchEditor({ church, mode = 'idle', initialValues, loading, onClose, onSaved, onError }: Props) {
+export function ChurchEditor({
+  church,
+  mode = 'idle',
+  initialValues,
+  loading,
+  onClose,
+  onSaved,
+  onError,
+  visibleFieldKeys,
+}: Props) {
   const [draft, setDraft] = useState<DraftMap>({});
   const [initialDraft, setInitialDraft] = useState<DraftMap>({});
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const allowedKeys = useMemo(() => {
+    if (!visibleFieldKeys || visibleFieldKeys.length === 0) return null;
+    return new Set<keyof ChurchPublic>(visibleFieldKeys);
+  }, [visibleFieldKeys]);
+
+  const sectionsToRender = useMemo(() => {
+    if (!allowedKeys) return FIELD_SECTIONS;
+    const filtered: FieldSection[] = [];
+    for (const section of FIELD_SECTIONS) {
+      const fields = section.fields.filter((field) => allowedKeys.has(field.key));
+      if (fields.length === 0) continue;
+      filtered.push({ ...section, fields });
+    }
+    return filtered;
+  }, [allowedKeys]);
 
   useEffect(() => {
     if (mode === 'create') {
@@ -820,7 +851,7 @@ export function ChurchEditor({ church, mode = 'idle', initialValues, loading, on
       )}
 
       <div className="space-y-8">
-        {FIELD_SECTIONS.map((section) => (
+        {sectionsToRender.map((section) => (
           <section key={section.title} className="space-y-4">
             <div>
               <h3 className="text-lg font-semibold text-white">{section.title}</h3>

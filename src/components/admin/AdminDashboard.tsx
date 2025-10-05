@@ -21,6 +21,29 @@ const TAB_DESCRIPTIONS: Record<AdminTab, string> = {
   rejected: 'Browse churches that have been rejected to verify details or reverse decisions.',
 };
 
+const REVIEW_FIELD_KEYS: Array<keyof ChurchPublic> = [
+  'name',
+  'admin_status',
+  'admin_notes',
+  'belief_type',
+  'trinitarian',
+  'logo_url',
+  'logo_width',
+  'logo_height',
+  'logo_aspect_ratio',
+  'banner_url',
+  'banner_width',
+  'banner_height',
+  'banner_aspect_ratio',
+  'address',
+  'locality',
+  'region',
+  'postal_code',
+  'country',
+  'latitude',
+  'longitude',
+];
+
 type ToastTone = 'success' | 'error' | 'info';
 
 type ToastState = {
@@ -81,6 +104,8 @@ export function AdminDashboard() {
   useEffect(() => {
     tabStateRef.current = tabStateByTab;
   }, [tabStateByTab]);
+
+  const isReviewTab = activeTab === 'needs_review' || activeTab === 'rejected';
 
   const [selectedChurch, setSelectedChurch] = useState<ChurchPublic | null>(null);
   const [selectedChurchLoading, setSelectedChurchLoading] = useState(false);
@@ -507,6 +532,7 @@ export function AdminDashboard() {
         mode={editorMode === 'create' ? 'create' : selectedChurch ? 'edit' : 'idle'}
         initialValues={editorMode === 'create' ? creationSeed ?? {} : undefined}
         loading={selectedChurchLoading && editorMode !== 'create'}
+        visibleFieldKeys={editorMode === 'edit' && isReviewTab ? REVIEW_FIELD_KEYS : undefined}
         onClose={() => {
           setSelectedChurch(null);
           setEditorMode('idle');

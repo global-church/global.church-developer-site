@@ -239,6 +239,7 @@ export function hydrateChurchPublic(row: SupabaseChurchRow): ChurchPublic {
     website_root: toStringOrNull(merged.website_root),
     pipeline_status: toPipelineStatusOrNull(merged.pipeline_status),
     admin_status: toAdminStatusOrNull(merged.admin_status),
+    admin_notes: toStringOrNull(merged.admin_notes),
     search_blob: toStringOrNull(merged.search_blob),
     belief_type: toBeliefTypeOrNull(merged.belief_type),
     trinitarian_beliefs: toBooleanOrNull(merged.trinitarian_beliefs),

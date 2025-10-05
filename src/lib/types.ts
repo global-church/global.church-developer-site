@@ -54,6 +54,7 @@ export type ChurchPublic = {
   // internal/search-ish
   pipeline_status: PipelineStatus | null;
   admin_status?: AdminStatus | null;
+  admin_notes?: string | null;
   search_blob: string | null;
 
   // beliefs / classification
