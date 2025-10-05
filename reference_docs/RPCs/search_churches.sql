@@ -54,7 +54,13 @@ RETURNS TABLE (
   overarching_name      TEXT,
   is_multi_campus       BOOLEAN,
   logo_url              TEXT,
+  logo_width            INT,
+  logo_height           INT,
+  logo_aspect_ratio     NUMERIC,
   banner_url            TEXT,
+  banner_width          INT,
+  banner_height         INT,
+  banner_aspect_ratio   NUMERIC,
   rank                  DOUBLE PRECISION
 )
 LANGUAGE plpgsql
@@ -110,7 +116,13 @@ BEGIN
     f.belief_type, f.denomination, f.trinitarian, f.extraction_confidence, f.church_summary,
     f.is_weekly_church, f.campus_name, f.overarching_name, f.is_multi_campus,
     f.logo_url,
+    f.logo_width,
+    f.logo_height,
+    f.logo_aspect_ratio,
     f.banner_url,
+    f.banner_width,
+    f.banner_height,
+    f.banner_aspect_ratio,
     f.search_rank AS rank
   FROM filtered AS f
   WHERE

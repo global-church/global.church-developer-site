@@ -1,6 +1,6 @@
 // supabase/functions/churches-get/index.ts
 // VERY IMPORTANT: THIS IS FOR REFERENCE ONLY. The actual implementation of this edge function is in Supabase.
-// Last synced: 2025-09-26
+// Last synced: 2025-10-04
 
 // This edge function routes to the correct RPC based on query params.
 
@@ -13,6 +13,7 @@
 //       https://supabase.com/docs/reference/javascript/select (schema() + select)
 
 
+// supabase/functions/churches-get/index.ts
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const ZUPLO_SECRET = Deno.env.get("ZUPLO_GATEWAY_TOKEN"); // keep in sync with Supabase env
@@ -41,7 +42,13 @@ const supabase = createClient(supabaseUrl, serviceKey, {
   "country",
   "website",
   "logo_url",
+  "logo_width",
+  "logo_height",
+  "logo_aspect_ratio",
   "banner_url",
+  "banner_width",
+  "banner_height",
+  "banner_aspect_ratio",
   "phone",
   "created_at",
   "updated_at",

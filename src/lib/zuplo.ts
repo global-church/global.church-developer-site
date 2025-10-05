@@ -135,7 +135,7 @@ export async function searchChurches(params: {
   const cursorValue = typeof next.cursor === 'string' && next.cursor.length > 0 ? next.cursor : null;
   if (!('fields' in next)) {
     // Request a minimal but linkable set to reduce payload
-    next.fields = 'church_id,name,latitude,longitude,locality,region,country,website,belief_type,denomination,ministry_names,service_languages,service_times,geojson';
+    next.fields = 'church_id,name,latitude,longitude,locality,region,country,website,logo_url,logo_width,logo_height,logo_aspect_ratio,banner_url,banner_width,banner_height,banner_aspect_ratio,belief_type,denomination,ministry_names,service_languages,service_times,geojson';
   } else if (typeof next.fields === 'string' && !String(next.fields).split(',').map(s => s.trim()).includes('church_id')) {
     next.fields = String(next.fields) + ',church_id';
   }

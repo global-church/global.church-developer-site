@@ -11,6 +11,7 @@ The goal of Global.Church is to break down data silos within the FaithTech ecosy
 - **Explorer:** An interactive map and search tool to explore the church database, powered by our API.
 - **Schema Documentation:** Clear explanations and a direct link to the versioned schema on GitHub.
 - **API Playground:** A link to our Zuplo-powered API playground for live query testing.
+- **Admin Portal (prototype):** Password-protected dashboard for searching and editing churches.
 
 ## Getting Started
 
@@ -33,6 +34,20 @@ npm run dev
 ```
 
 Open [http://localhost:3000](https://www.google.com/search?q=http://localhost:3000) with your browser to see the result.
+
+## Admin Portal Prototype
+
+Set up the admin dashboard by configuring the following environment variables in `.env.local`:
+
+```
+ADMIN_PORTAL_PASSWORD=change-me
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+# Optional override if your table name differs
+# ADMIN_SUPABASE_CHURCHES_TABLE=churches
+```
+
+Then visit [http://localhost:3000/admin](http://localhost:3000/admin) and unlock the portal with the password. Record updates require a Supabase service role key; without it, the UI will surface an actionable error.
 
 ## Deploy on Vercel
 

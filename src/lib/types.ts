@@ -67,7 +67,13 @@ export type ChurchPublic = {
   youtube_url: string | null;
   social_media: string[] | null;
   logo_url?: string | null;
+  logo_width?: number | null;
+  logo_height?: number | null;
+  logo_aspect_ratio?: number | null;
   banner_url?: string | null;
+  banner_width?: number | null;
+  banner_height?: number | null;
+  banner_aspect_ratio?: number | null;
 
   // contact
   scraped_email: string | null;

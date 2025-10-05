@@ -134,6 +134,78 @@ export default async function ChurchPage(
     return `https://${trimmed}`
   })()
 
+  const parsePositiveNumber = (value: unknown): number | null => {
+    if (typeof value === 'number') return Number.isFinite(value) && value > 0 ? value : null
+    if (typeof value === 'string' && value.trim().length) {
+      const asNumber = Number(value)
+      return Number.isFinite(asNumber) && asNumber > 0 ? asNumber : null
+    }
+    return null
+  }
+
+  const logoWidth = parsePositiveNumber((church as { logo_width?: number | string | null }).logo_width)
+  const logoHeight = parsePositiveNumber((church as { logo_height?: number | string | null }).logo_height)
+  const LOGO_MIN_DIMENSION = 96
+  const isLogoEligible = (() => {
+    if (!logoUrl) return false
+    if (logoWidth && logoHeight) {
+      return logoWidth >= LOGO_MIN_DIMENSION && logoHeight >= LOGO_MIN_DIMENSION
+    }
+    // When metadata is missing, allow the image through (we'll size conservatively)
+    return true
+  })()
+  const logoAspectRatio = (() => {
+    const supplied = parsePositiveNumber((church as { logo_aspect_ratio?: number | string | null }).logo_aspect_ratio)
+    if (supplied) return supplied
+    if (logoWidth && logoHeight) {
+      const ratio = logoWidth / logoHeight
+      return Number.isFinite(ratio) && ratio > 0 ? ratio : null
+    }
+    return null
+  })()
+
+  const computedLogoFrame = (() => {
+    if (!logoUrl || !isLogoEligible) return null
+    const ratio = logoAspectRatio && Number.isFinite(logoAspectRatio) && logoAspectRatio > 0 ? logoAspectRatio : null
+    const MAX_WIDTH = 240
+    const MAX_HEIGHT = 160
+    const MIN_DIMENSION = LOGO_MIN_DIMENSION
+
+    if (!ratio) {
+      const fallback = 160
+      return {
+        width: fallback,
+        height: fallback,
+        aspectRatio: 1
+      }
+    }
+
+    let width = MAX_WIDTH
+    let height = width / ratio
+
+    if (height > MAX_HEIGHT) {
+      height = MAX_HEIGHT
+      width = height * ratio
+    }
+
+    const smallestSide = Math.min(width, height)
+    if (smallestSide < MIN_DIMENSION) {
+      const scale = MIN_DIMENSION / smallestSide
+      width = Math.min(MAX_WIDTH, width * scale)
+      height = Math.min(MAX_HEIGHT, height * scale)
+    }
+
+    return {
+      width: Math.round(width),
+      height: Math.round(height),
+      aspectRatio: ratio
+    }
+  })()
+
+  const logoPadding = computedLogoFrame
+    ? Math.max(8, Math.min(16, Math.round(Math.min(computedLogoFrame.width, computedLogoFrame.height) * 0.08)))
+    : 12
+
   const bannerUrl = (() => {
     const raw = (church as { banner_url?: string | null }).banner_url ?? null
     if (!raw) return null
@@ -142,6 +214,67 @@ export default async function ChurchPage(
     if (/^https?:\/\//i.test(trimmed)) return trimmed
     if (trimmed.startsWith('//')) return `https:${trimmed}`
     return `https://${trimmed}`
+  })()
+
+  const bannerWidth = parsePositiveNumber((church as { banner_width?: number | string | null }).banner_width)
+  const bannerHeight = parsePositiveNumber((church as { banner_height?: number | string | null }).banner_height)
+  const BANNER_MIN_WIDTH = 600
+  const BANNER_MIN_HEIGHT = 200
+  const isBannerEligible = (() => {
+    if (!bannerUrl) return false
+    if (bannerWidth && bannerHeight) {
+      return bannerWidth >= BANNER_MIN_WIDTH && bannerHeight >= BANNER_MIN_HEIGHT
+    }
+    // Allow when metadata missing (can't evaluate quality client-side)
+    return true
+  })()
+  const bannerAspectRatio = (() => {
+    const supplied = parsePositiveNumber((church as { banner_aspect_ratio?: number | string | null }).banner_aspect_ratio)
+    if (supplied) return supplied
+    if (bannerWidth && bannerHeight) {
+      const ratio = bannerWidth / bannerHeight
+      return Number.isFinite(ratio) && ratio > 0 ? ratio : null
+    }
+    return null
+  })()
+
+  const computedBannerFrame = (() => {
+    if (!bannerUrl || !isBannerEligible) return null
+    const ratio = bannerAspectRatio && Number.isFinite(bannerAspectRatio) && bannerAspectRatio > 0 ? bannerAspectRatio : null
+    const MAX_WIDTH = 960
+    const MAX_HEIGHT = 360
+    const MIN_HEIGHT = 180
+
+    if (!ratio) {
+      return {
+        width: 960,
+        height: 320,
+        aspectRatio: 3
+      }
+    }
+
+    let width = MAX_WIDTH
+    let height = width / ratio
+
+    if (height > MAX_HEIGHT) {
+      height = MAX_HEIGHT
+      width = height * ratio
+    }
+
+    if (height < MIN_HEIGHT) {
+      height = MIN_HEIGHT
+      width = height * ratio
+      if (width > MAX_WIDTH) {
+        width = MAX_WIDTH
+        height = width / ratio
+      }
+    }
+
+    return {
+      width: Math.round(width),
+      height: Math.round(height),
+      aspectRatio: ratio
+    }
   })()
 
   // Format denomination: snake_case -> Title Case with conventional rules
@@ -327,41 +460,56 @@ export default async function ChurchPage(
 
       {/* Church Info */}
       <div className="bg-white px-4 py-6">
-        {bannerUrl && (
-          <div className="relative w-full max-w-4xl mx-auto mb-6 overflow-hidden rounded-2xl border border-gray-200">
+        {computedBannerFrame && (
+          <div
+            className="relative w-full max-w-4xl mx-auto mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white"
+            style={{
+              maxWidth: '100%',
+              width: `${computedBannerFrame.width}px`
+            }}
+          >
             <Image
-              src={bannerUrl}
+              src={bannerUrl as string}
               alt={`${church.name ?? 'Church'} banner`}
-              width={1600}
-              height={600}
-              className="h-48 w-full object-cover sm:h-60"
+              width={computedBannerFrame.width}
+              height={computedBannerFrame.height}
+              className="w-full object-cover"
+              style={{ width: '100%', height: 'auto' }}
               priority={false}
-              sizes="(max-width: 768px) 100vw, 800px"
+              sizes="(max-width: 768px) 100vw, 960px"
               unoptimized
             />
           </div>
         )}
         <div className="text-center mb-6">
-          <div
-            className={logoUrl
-              ? 'mx-auto mb-4 size-24 rounded-full overflow-hidden relative border border-gray-200 bg-white shadow-sm'
-              : 'mx-auto mb-4 size-24 rounded-full overflow-hidden relative bg-gradient-to-br from-teal-200 to-blue-300 grid place-items-center text-3xl font-bold text-slate-800'
-            }
-          >
-            {logoUrl ? (
+          {computedLogoFrame ? (
+            <div
+              className="mx-auto mb-4 flex items-center justify-center overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
+              style={{
+                width: `${computedLogoFrame.width}px`,
+                height: `${computedLogoFrame.height}px`,
+                aspectRatio: `${computedLogoFrame.aspectRatio}`,
+                boxSizing: 'border-box',
+                padding: `${logoPadding}px`
+              }}
+            >
               <Image
-                src={logoUrl}
+                src={logoUrl as string}
                 alt={`${church.name ?? 'Church'} logo`}
-                fill
-                className="object-contain bg-white"
-                sizes="96px"
+                width={computedLogoFrame.width}
+                height={computedLogoFrame.height}
+                className="object-contain"
+                style={{ width: '100%', height: '100%' }}
+                sizes="(max-width: 768px) 60vw, 240px"
                 priority={false}
                 unoptimized
               />
-            ) : (
+            </div>
+          ) : (
+            <div className="mx-auto mb-4 size-24 rounded-full overflow-hidden relative bg-gradient-to-br from-teal-200 to-blue-300 grid place-items-center text-3xl font-bold text-slate-800">
               <span>{churchInitial}</span>
-            )}
-          </div>
+            </div>
+          )}
           <h2 className="text-2xl font-bold text-gray-900 mb-2">{church.name}</h2>
           <p className="text-gray-600 leading-relaxed max-w-md mx-auto">
             {church.church_summary ?? "We weren't able to generate a summary for this church, which means you'll have to go visit to learn more about it! :)"}

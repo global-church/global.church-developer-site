@@ -58,7 +58,13 @@ RETURNS TABLE (
   is_multi_campus       BOOLEAN,
   distance_m            DOUBLE PRECISION,
   logo_url              TEXT,
-  banner_url            TEXT
+  logo_width            INT,
+  logo_height           INT,
+  logo_aspect_ratio     NUMERIC,
+  banner_url            TEXT,
+  banner_width          INT,
+  banner_height         INT,
+  banner_aspect_ratio   NUMERIC
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -101,7 +107,13 @@ BEGIN
     b.is_weekly_church, b.campus_name, b.overarching_name, b.is_multi_campus,
     b.dist_m::DOUBLE PRECISION AS distance_m,
     b.logo_url,
-    b.banner_url
+    b.logo_width,
+    b.logo_height,
+    b.logo_aspect_ratio,
+    b.banner_url,
+    b.banner_width,
+    b.banner_height,
+    b.banner_aspect_ratio
   FROM v AS b
   WHERE
     (p_country     IS NULL OR b.country            = p_country)

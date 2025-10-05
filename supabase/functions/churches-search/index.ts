@@ -1,6 +1,6 @@
 // supabase/functions/churches-search/index.ts
 // VERY IMPORTANT: THIS IS FOR REFERENCE ONLY. The actual implementation of this edge function is in Supabase.
-// Last synced: 2025-09-26
+// Last synced: 2025-10-04
 // This edge function routes to the correct RPC based on query params.
 
 
@@ -34,7 +34,13 @@ const supabase = createClient(supabaseUrl, serviceKey, {
   "country",
   "website",
   "logo_url",
+  "logo_width",
+  "logo_height",
+  "logo_aspect_ratio",
   "banner_url",
+  "banner_width",
+  "banner_height",
+  "banner_aspect_ratio",
   "phone",
   "created_at",
   "updated_at",
@@ -75,7 +81,13 @@ const DEFAULT_FIELDS = [
   "country",
   "website",
   "logo_url",
+  "logo_width",
+  "logo_height",
+  "logo_aspect_ratio",
   "banner_url",
+  "banner_width",
+  "banner_height",
+  "banner_aspect_ratio",
   "url_beliefs",
   "url_giving",
   "url_live",
