@@ -2,7 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { createClient, type PostgrestSingleResponse } from '@supabase/supabase-js';
-import type { ChurchPublic } from '@/lib/types';
+import type { AdminStatus, ChurchPublic } from '@/lib/types';
 import {
   ADMIN_SESSION_COOKIE,
   ADMIN_SESSION_MAX_AGE,
@@ -10,6 +10,7 @@ import {
   isAdminPasswordConfigured,
   matchesSessionSignature,
 } from '@/lib/adminAuth';
+import { hydrateChurchList, hydrateChurchPublic } from '@/lib/adminChurchHydration';
 
 export type LoginFormState = {
   success: boolean;
@@ -32,6 +33,22 @@ export type CreateChurchPayload = {
 };
 
 export type CreateChurchResult = SaveChurchResult;
+
+export type AdminChurchListParams = {
+  status: AdminStatus;
+  limit?: number;
+  cursor?: string | null;
+  query?: string;
+  locality?: string;
+  id?: string;
+};
+
+export type AdminChurchListResult = {
+  items: ChurchPublic[];
+  nextCursor: string | null;
+  previousCursor: string | null;
+  count: number | null;
+};
 
 const secureCookie = process.env.NODE_ENV === 'production';
 
@@ -118,6 +135,29 @@ function scrubPayload(values: Partial<ChurchPublic>): Record<string, unknown> {
   return output;
 }
 
+function parseCursorValue(cursor: string | null | undefined): number {
+  if (!cursor) return 0;
+  const parsed = Number(cursor);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
+  return Math.floor(parsed);
+}
+
+function clampLimit(limit: number | undefined): number {
+  if (!Number.isFinite(limit ?? NaN)) {
+    return 25;
+  }
+  const normalised = Math.floor(limit as number);
+  if (normalised < 1) return 1;
+  if (normalised > 100) return 100;
+  return normalised;
+}
+
+function escapeILikePattern(value: string): string {
+  return value.replace(/[%_]/g, (char) => `\\${char}`);
+}
+
 function mapResponse(
   response: PostgrestSingleResponse<ChurchPublic>,
 ): CreateChurchResult {
@@ -196,4 +236,89 @@ export async function createChurch(payload: CreateChurchPayload): Promise<Create
     const message = err instanceof Error ? err.message : String(err);
     return { success: false, error: message };
   }
+}
+
+export async function fetchAdminChurchesByStatus(params: AdminChurchListParams): Promise<AdminChurchListResult> {
+  const authError = ensureAuthenticated();
+  if (authError) {
+    throw new Error(authError);
+  }
+
+  const { client, table, error: clientError } = createSupabaseAdminClient();
+  if (!client || clientError) {
+    throw new Error(clientError ?? 'Failed to initialise Supabase client.');
+  }
+
+  const limit = clampLimit(params.limit);
+  const offset = parseCursorValue(params.cursor);
+
+  let query = client
+    .from(table)
+    .select('*, enriched_json', { count: 'exact' })
+    .eq('admin_status', params.status);
+
+  if (params.id) {
+    query = query.eq('church_id', params.id);
+  }
+
+  if (params.locality) {
+    query = query.ilike('locality', `%${escapeILikePattern(params.locality.trim())}%`);
+  }
+
+  if (params.query) {
+    const search = `%${escapeILikePattern(params.query.trim())}%`;
+    query = query.ilike('name', search);
+  }
+
+  const { data, error, count } = await query
+    .order('name', { ascending: true })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const items = hydrateChurchList(data ?? []);
+  const hasMore = typeof count === 'number' ? offset + limit < count : (data?.length ?? 0) === limit;
+  const nextCursor = hasMore ? String(offset + limit) : null;
+  const previousCursor = offset > 0 ? String(Math.max(0, offset - limit)) : null;
+
+  return {
+    items,
+    nextCursor,
+    previousCursor,
+    count: count ?? null,
+  };
+}
+
+export async function getAdminChurchById(churchId: string): Promise<ChurchPublic | null> {
+  const authError = ensureAuthenticated();
+  if (authError) {
+    throw new Error(authError);
+  }
+
+  if (!churchId) {
+    throw new Error('Missing church identifier.');
+  }
+
+  const { client, table, error: clientError } = createSupabaseAdminClient();
+  if (!client || clientError) {
+    throw new Error(clientError ?? 'Failed to initialise Supabase client.');
+  }
+
+  const { data, error } = await client
+    .from(table)
+    .select('*, enriched_json')
+    .eq('church_id', churchId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return hydrateChurchPublic(data);
 }

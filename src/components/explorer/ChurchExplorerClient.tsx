@@ -597,6 +597,7 @@ const formatDenomination = (denom?: string | null) => {
     website: r.website,
     website_root: null,
     pipeline_status: null,
+    admin_status: null,
     search_blob: null,
     belief_type: r.belief_type ?? null,
     trinitarian_beliefs: null,

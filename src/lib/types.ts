@@ -24,6 +24,8 @@ export type PipelineStatus =
   | 'non_christian_terms'
   | 'gers_id_already_in_db';
 
+export type AdminStatus = 'approved' | 'needs_review' | 'rejected';
+
 /** Minimal GeoJSON Point for map libs (lng, lat) */
 export type GeoJSONPoint = {
   type: 'Point';
@@ -51,6 +53,7 @@ export type ChurchPublic = {
 
   // internal/search-ish
   pipeline_status: PipelineStatus | null;
+  admin_status?: AdminStatus | null;
   search_blob: string | null;
 
   // beliefs / classification

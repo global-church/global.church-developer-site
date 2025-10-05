@@ -36,6 +36,7 @@ type FieldConfig = {
   readOnly?: boolean;
   options?: Array<{ label: string; value: string }>;
   requiresAttention?: boolean;
+  attentionValues?: string[];
 };
 
 type FieldSection = {
@@ -271,7 +272,18 @@ const FIELD_SECTIONS: FieldSection[] = [
     title: 'Core Details',
     fields: [
       { key: 'name', label: 'Name', type: 'text', required: true, requiresAttention: true },
-      { key: 'pipeline_status', label: 'Pipeline Status', type: 'text' },
+      {
+        key: 'admin_status',
+        label: 'Admin Status',
+        type: 'select',
+        options: [
+          { label: 'Approved', value: 'approved' },
+          { label: 'Needs Review', value: 'needs_review' },
+          { label: 'Rejected', value: 'rejected' },
+        ],
+        requiresAttention: true,
+        attentionValues: ['needs_review'],
+      },
       {
         key: 'belief_type',
         label: 'Belief Type',
@@ -603,7 +615,9 @@ export function ChurchEditor({ church, mode = 'idle', initialValues, loading, on
     if (config.type === 'serviceTimes') {
       isEmpty = value === '' || value === '[]';
     }
-    const attentionClass = config.requiresAttention && isEmpty ? ' border-white/80 ring-1 ring-white/70' : '';
+    const matchesAttentionValue = config.attentionValues?.includes(trimmed) ?? false;
+    const needsAttention = config.requiresAttention && (isEmpty || matchesAttentionValue);
+    const attentionClass = needsAttention ? ' border-white/80 ring-1 ring-white/70' : '';
     const computedClass = `${baseInputClass}${config.readOnly ? ' cursor-not-allowed opacity-60 focus:ring-0' : ''}${attentionClass}`;
 
     const onChange = (nextValue: string) => {
