@@ -4,9 +4,11 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 type CookieAccessor = {
-  getAll: () => { name: string; value: string }[];
-  setAll?: (cookies: { name: string; value: string; options: CookieOptions }[]) => void;
+  getAll: () => Promise<{ name: string; value: string }[]>;
+  setAll?: (cookies: { name: string; value: string; options: CookieOptions }[]) => Promise<void>;
 };
+
+type CookieStore = Awaited<ReturnType<typeof cookies>>;
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -25,14 +27,21 @@ function assertSupabaseKey(): asserts supabaseAnonKey is string & { length: numb
 
 type DefaultDatabase = Record<string, unknown>;
 
-function buildCookieAdapter(store: ReturnType<typeof cookies>, mutable: boolean): CookieAccessor {
+async function readAllCookies(store: CookieStore): Promise<{ name: string; value: string }[]> {
+  const entries = store.getAll();
+  return entries.map(({ name, value }) => ({ name, value }));
+}
+
+function buildCookieAdapter(store: CookieStore, mutable: boolean): CookieAccessor {
   return {
-    getAll: () => store.getAll().map(({ name, value }) => ({ name, value })),
+    getAll: () => readAllCookies(store),
     setAll: mutable
-      ? (supabaseCookies) => {
-          for (const { name, value, options } of supabaseCookies) {
-            store.set({ name, value, ...options });
-          }
+      ? async (supabaseCookies) => {
+          await Promise.all(
+            supabaseCookies.map(async ({ name, value, options }) => {
+              store.set({ name, value, ...options });
+            }),
+          );
         }
       : undefined,
   };
@@ -44,17 +53,17 @@ function ensureSupabaseConfig(): { url: string; key: string } {
   return { url: supabaseUrl, key: supabaseAnonKey };
 }
 
-export function createSupabaseServerComponentClient<Database extends DefaultDatabase = DefaultDatabase>(): SupabaseClient<Database> {
+export async function createSupabaseServerComponentClient<Database extends DefaultDatabase = DefaultDatabase>(): Promise<SupabaseClient<Database>> {
   const { url, key } = ensureSupabaseConfig();
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   return createServerClient<Database>(url, key, {
     cookies: buildCookieAdapter(cookieStore, false),
   });
 }
 
-export function createSupabaseServerActionClient<Database extends DefaultDatabase = DefaultDatabase>(): SupabaseClient<Database> {
+export async function createSupabaseServerActionClient<Database extends DefaultDatabase = DefaultDatabase>(): Promise<SupabaseClient<Database>> {
   const { url, key } = ensureSupabaseConfig();
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   return createServerClient<Database>(url, key, {
     cookies: buildCookieAdapter(cookieStore, true),
   });

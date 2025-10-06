@@ -31,7 +31,7 @@ export function AdminLoginForm({ supabaseConfigured, initialEmail, membershipErr
   useEffect(() => {
     if (state.success) {
       startTransition(async () => {
-        router.refresh();
+        router.replace('/admin');
       });
     }
   }, [router, startTransition, state.success]);

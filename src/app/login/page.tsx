@@ -1,9 +1,9 @@
-import { AdminDashboard } from '@/components/admin/AdminDashboard';
+import { redirect } from 'next/navigation';
 import { AdminLoginForm } from '@/components/admin/AdminLoginForm';
 import { createSupabaseServerComponentClient, isSupabaseConfigured } from '@/lib/supabaseServerClient';
 import { getCurrentAdmin } from '@/lib/adminSession';
 
-export default async function AdminPage() {
+export default async function LoginPage() {
   const supabaseConfigured = isSupabaseConfigured();
 
   if (!supabaseConfigured) {
@@ -11,33 +11,31 @@ export default async function AdminPage() {
   }
 
   const supabase = await createSupabaseServerComponentClient();
-
   const {
     data: { user },
-    error: sessionError,
+    error,
   } = await supabase.auth.getUser();
 
   let membershipError: string | null = null;
-  let isAdmin = false;
 
-  if (!sessionError && user) {
+  if (!error && user) {
     try {
       const membership = await getCurrentAdmin(supabase);
-      isAdmin = Boolean(membership);
-    } catch (error) {
-      membershipError = error instanceof Error ? error.message : 'Unable to verify admin membership.';
+      if (membership) {
+        redirect('/admin');
+      }
+      membershipError = 'Your account is not authorised for the admin portal.';
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to verify admin membership.';
+      membershipError = message;
     }
   }
 
-  if (!isAdmin) {
-    return (
-      <AdminLoginForm
-        supabaseConfigured
-        initialEmail={user?.email ?? undefined}
-        membershipError={membershipError}
-      />
-    );
-  }
-
-  return <AdminDashboard />;
+  return (
+    <AdminLoginForm
+      supabaseConfigured
+      initialEmail={user?.email ?? undefined}
+      membershipError={membershipError}
+    />
+  );
 }

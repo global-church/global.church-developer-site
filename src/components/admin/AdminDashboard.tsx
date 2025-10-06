@@ -1,10 +1,20 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
 import { useRouter } from 'next/navigation';
+import { createPortal } from 'react-dom';
 import { searchChurches, getChurchById } from '@/lib/zuplo';
 import type { ChurchPublic } from '@/lib/types';
-import { fetchAdminChurchesByStatus, getAdminChurchById, logoutAdmin } from '@/app/admin/actions';
+import { fetchAdminChurchesByStatus, getAdminChurchById } from '@/app/admin/actions';
+import { useSupabaseBrowserClient } from '@/hooks/useSupabaseBrowserClient';
 import { ChurchEditor } from './ChurchEditor';
 
 type AdminTab = 'public' | 'needs_review' | 'rejected';
@@ -92,6 +102,41 @@ const createTabState = (): TabState => ({
 
 const TABS: AdminTab[] = ['public', 'needs_review', 'rejected'];
 
+function deriveInitials(name: string | null | undefined, email: string | null | undefined): string {
+  if (name) {
+    const parts = name
+      .split(/\s+/)
+      .filter((part) => part.trim().length > 0);
+    if (parts.length >= 2) {
+      return `${parts[0]![0]!.toUpperCase()}${parts[1]![0]!.toUpperCase()}`;
+    }
+    if (parts.length === 1) {
+      const first = parts[0]!
+        .trim()
+        .replace(/[^A-Za-z0-9]/g, '');
+      if (first.length >= 2) {
+        return `${first[0]!.toUpperCase()}${first[1]!.toUpperCase()}`;
+      }
+      if (first.length === 1) {
+        return `${first[0]!.toUpperCase()}${first[0]!.toUpperCase()}`;
+      }
+    }
+  }
+
+  if (email) {
+    const clean = email.replace(/[^A-Za-z0-9]/g, '');
+    if (clean.length >= 2) {
+      return clean.slice(0, 2).toUpperCase();
+    }
+    if (clean.length === 1) {
+      const letter = clean[0]!.toUpperCase();
+      return `${letter}${letter}`;
+    }
+  }
+
+  return 'AD';
+}
+
 export function AdminDashboard() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<AdminTab>('public');
@@ -112,7 +157,63 @@ export function AdminDashboard() {
   const [editorMode, setEditorMode] = useState<'idle' | 'edit' | 'create'>('idle');
   const [creationSeed, setCreationSeed] = useState<Partial<ChurchPublic> | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
-  const [logoutPending, startLogout] = useTransition();
+
+  const supabase = useSupabaseBrowserClient();
+  const [profile, setProfile] = useState<{ email: string; fullName: string | null } | null>(null);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordPending, setPasswordPending] = useState(false);
+  const [signOutPending, setSignOutPending] = useState(false);
+  const accountButtonRef = useRef<HTMLButtonElement | null>(null);
+  const menuContainerRef = useRef<HTMLDivElement | null>(null);
+  const changePasswordButtonRef = useRef<HTMLButtonElement | null>(null);
+  const modalRef = useRef<HTMLDivElement | null>(null);
+  const passwordInputRef = useRef<HTMLInputElement | null>(null);
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
+
+  const redirectToLogin = useCallback(() => {
+    setAccountMenuOpen(false);
+    setChangePasswordOpen(false);
+    setSignOutPending(false);
+    setPasswordPending(false);
+    router.replace('/login');
+  }, [router]);
+
+  const profileLabel = profile?.fullName ?? profile?.email ?? 'Admin user';
+  const avatarInitials = useMemo(
+    () => deriveInitials(profile?.fullName ?? null, profile?.email ?? null),
+    [profile?.email, profile?.fullName],
+  );
+
+  const passwordRules = useMemo(
+    () => ({
+      length: newPassword.length >= 12,
+      uppercase: /[A-Z]/.test(newPassword),
+      lowercase: /[a-z]/.test(newPassword),
+      number: /[0-9]/.test(newPassword),
+      symbol: /[^A-Za-z0-9]/.test(newPassword),
+    }),
+    [newPassword],
+  );
+
+  const passwordChecklist = useMemo(
+    () => [
+      { key: 'length', label: 'At least 12 characters', met: passwordRules.length },
+      { key: 'uppercase', label: 'Contains an uppercase letter', met: passwordRules.uppercase },
+      { key: 'lowercase', label: 'Contains a lowercase letter', met: passwordRules.lowercase },
+      { key: 'number', label: 'Includes a number', met: passwordRules.number },
+      { key: 'symbol', label: 'Includes a symbol', met: passwordRules.symbol },
+    ],
+    [passwordRules],
+  );
+
+  const passwordsMatch = newPassword.length > 0 && newPassword === confirmPassword;
+  const meetsStrength = passwordChecklist.every((item) => item.met);
+  const canSubmitPassword = meetsStrength && passwordsMatch && !passwordPending;
+  const showPasswordMismatch = confirmPassword.length > 0 && !passwordsMatch;
 
   const pushToast = useCallback((tone: ToastTone, message: string) => {
     setToast({ id: Date.now(), tone, message });
@@ -125,6 +226,247 @@ export function AdminDashboard() {
     }, 4000);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (!active) return;
+
+      if (error || !data.user) {
+        redirectToLogin();
+        return;
+      }
+
+      setProfile({
+        email: data.user.email ?? '',
+        fullName: (data.user.user_metadata?.full_name as string | null) ?? null,
+      });
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [redirectToLogin, supabase]);
+
+  const closeChangePassword = useCallback(() => {
+    setChangePasswordOpen(false);
+    setPasswordPending(false);
+    setPasswordError(null);
+    setNewPassword('');
+    setConfirmPassword('');
+
+    const target = lastFocusedRef.current ?? accountButtonRef.current;
+    if (target) {
+      window.requestAnimationFrame(() => {
+        target.focus();
+      });
+    }
+    lastFocusedRef.current = null;
+  }, []);
+
+  const openChangePassword = useCallback(() => {
+    lastFocusedRef.current = (document.activeElement as HTMLElement | null) ?? null;
+    setAccountMenuOpen(false);
+    setPasswordError(null);
+    setNewPassword('');
+    setConfirmPassword('');
+    setChangePasswordOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (!accountMenuOpen) {
+      return;
+    }
+
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        menuContainerRef.current?.contains(target) ||
+        accountButtonRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setAccountMenuOpen(false);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setAccountMenuOpen(false);
+        accountButtonRef.current?.focus();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [accountMenuOpen]);
+
+  useEffect(() => {
+    if (!accountMenuOpen) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      changePasswordButtonRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [accountMenuOpen]);
+
+  useEffect(() => {
+    if (!changePasswordOpen) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      passwordInputRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [changePasswordOpen]);
+
+  useEffect(() => {
+    if (!changePasswordOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!modalRef.current) {
+        return;
+      }
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeChangePassword();
+        return;
+      }
+
+      if (event.key !== 'Tab') {
+        return;
+      }
+
+      const focusable = modalRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      const active = document.activeElement as HTMLElement | null;
+
+      if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+        return;
+      }
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [changePasswordOpen, closeChangePassword]);
+
+  const handleSignOut = useCallback(async () => {
+    if (signOutPending) {
+      return;
+    }
+
+    setSignOutPending(true);
+    setAccountMenuOpen(false);
+
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        if ((error as { name?: string })?.name === 'AuthSessionMissingError') {
+          redirectToLogin();
+          return;
+        }
+        const message = error.message || 'Unable to sign out.';
+        setSignOutPending(false);
+        pushToast('error', message);
+        return;
+      }
+
+      redirectToLogin();
+    } catch (err) {
+      setSignOutPending(false);
+      const message = err instanceof Error ? err.message : 'Unable to sign out.';
+      pushToast('error', message);
+    }
+  }, [pushToast, redirectToLogin, signOutPending, supabase]);
+
+  const handlePasswordSubmit = useCallback(async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (passwordPending) {
+      return;
+    }
+
+    if (!meetsStrength) {
+      setPasswordError('Password does not meet the strength requirements.');
+      return;
+    }
+
+    if (!passwordsMatch) {
+      setPasswordError('Passwords do not match.');
+      return;
+    }
+
+    setPasswordPending(true);
+    setPasswordError(null);
+
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+      if (error) {
+        if ((error as { name?: string })?.name === 'AuthSessionMissingError') {
+          setPasswordPending(false);
+          setPasswordError('Session expired. Redirecting to login…');
+          window.setTimeout(() => {
+            redirectToLogin();
+          }, 1200);
+          return;
+        }
+
+        if ((error as { name?: string; code?: string })?.name === 'AuthWeakPasswordError' || error.code === 'weak_password') {
+          setPasswordPending(false);
+          setPasswordError(error.message || 'Password does not meet the strength requirements.');
+          return;
+        }
+
+        const message = error.message || 'Unable to update password. Please try again.';
+        setPasswordPending(false);
+        setPasswordError(message);
+        pushToast('error', message);
+        return;
+      }
+
+      setPasswordPending(false);
+      closeChangePassword();
+      pushToast('success', 'Password updated.');
+    } catch (err) {
+      setPasswordPending(false);
+      const message = err instanceof Error ? err.message : 'Unable to update password. Please try again.';
+      setPasswordError(message);
+      pushToast('error', message);
+    }
+  }, [closeChangePassword, meetsStrength, newPassword, passwordPending, passwordsMatch, pushToast, redirectToLogin, supabase]);
+
+  const handleModalOverlayClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget) {
+      closeChangePassword();
+    }
+  }, [closeChangePassword]);
 
   const updateTabState = useCallback((tab: AdminTab, updater: (state: TabState) => TabState) => {
     setTabStateByTab((prev) => {
@@ -241,13 +583,6 @@ export function AdminDashboard() {
     updateTabState(activeTab, () => createTabState());
   }, [activeTab, updateTabState]);
 
-  const handleLogout = useCallback(() => {
-    startLogout(async () => {
-      await logoutAdmin();
-      router.refresh();
-    });
-  }, [router]);
-
   const handleStartCreation = useCallback(() => {
     setSelectedChurch(null);
     setEditorMode('create');
@@ -320,7 +655,7 @@ export function AdminDashboard() {
             Search and manage churches across the Global.Church datasets.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={handleStartCreation}
@@ -328,14 +663,59 @@ export function AdminDashboard() {
           >
             Add church
           </button>
-          <button
-            type="button"
-            onClick={handleLogout}
-            disabled={logoutPending}
-            className="inline-flex items-center justify-center rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {logoutPending ? 'Signing out…' : 'Sign out'}
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              ref={accountButtonRef}
+              aria-haspopup="menu"
+              aria-expanded={accountMenuOpen}
+              aria-controls="admin-account-menu"
+              aria-label={`Account menu for ${profileLabel}`}
+              onClick={() => setAccountMenuOpen((open) => !open)}
+              className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-2 py-1 text-sm font-medium text-slate-200 transition hover:border-slate-500 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-500 text-base font-semibold text-white">
+                {avatarInitials}
+              </span>
+              <svg
+                className={`h-4 w-4 text-slate-300 transition ${accountMenuOpen ? 'rotate-180' : ''}`}
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.195l3.71-3.964a.75.75 0 1 1 1.08 1.04l-4.25 4.54a.75.75 0 0 1-1.08 0l-4.25-4.54a.75.75 0 0 1 .02-1.06z" />
+              </svg>
+            </button>
+
+            {accountMenuOpen && (
+              <div
+                id="admin-account-menu"
+                ref={menuContainerRef}
+                role="menu"
+                className="absolute right-0 z-40 mt-2 w-48 rounded-lg border border-slate-700 bg-slate-950/95 p-1 shadow-xl backdrop-blur"
+              >
+                <button
+                  type="button"
+                  ref={changePasswordButtonRef}
+                  role="menuitem"
+                  onClick={openChangePassword}
+                  className="flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800/80 focus:outline-none focus-visible:bg-slate-800/80"
+                >
+                  Change password
+                </button>
+                <div className="mx-2 my-1 h-px bg-slate-800" role="separator" />
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handleSignOut}
+                  disabled={signOutPending}
+                  className="flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800/80 focus:outline-none focus-visible:bg-slate-800/80 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {signOutPending ? 'Signing out…' : 'Sign out'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -551,6 +931,139 @@ export function AdminDashboard() {
         }}
         onError={(message) => pushToast('error', message)}
       />
+
+      {changePasswordOpen && typeof window !== 'undefined'
+        ? createPortal(
+            (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4"
+                role="presentation"
+                onClick={handleModalOverlayClick}
+              >
+                <div
+                  ref={modalRef}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="change-password-title"
+                  className="w-full max-w-md rounded-lg border border-slate-700 bg-slate-900 p-6 shadow-2xl"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 id="change-password-title" className="text-xl font-semibold text-white">
+                        Change password
+                      </h2>
+                      <p className="mt-1 text-sm text-slate-300">
+                        Create a strong password to secure your admin account.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={closeChangePassword}
+                      className="rounded-md border border-transparent p-1 text-slate-300 transition hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+                      aria-label="Close change password dialog"
+                    >
+                      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path
+                          fillRule="evenodd"
+                          d="M4.22 4.22a.75.75 0 0 1 1.06 0L10 8.94l4.72-4.72a.75.75 0 1 1 1.06 1.06L11.06 10l4.72 4.72a.75.75 0 1 1-1.06 1.06L10 11.06l-4.72 4.72a.75.75 0 0 1-1.06-1.06L8.94 10 4.22 5.28a.75.75 0 0 1 0-1.06Z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <form className="mt-6 space-y-5" onSubmit={handlePasswordSubmit}>
+                    <div className="space-y-2">
+                      <label className="block space-y-1">
+                        <span className="text-sm font-medium text-slate-200">New password</span>
+                        <input
+                          ref={passwordInputRef}
+                          type="password"
+                          name="new-password"
+                          value={newPassword}
+                          onChange={(event) => {
+                            setNewPassword(event.target.value);
+                            setPasswordError(null);
+                          }}
+                          className="w-full rounded-md border border-slate-700 bg-slate-950/80 px-3 py-2 text-slate-100 shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                          autoComplete="new-password"
+                          required
+                          disabled={passwordPending}
+                        />
+                      </label>
+                      <div className="rounded-md border border-slate-800/70 bg-slate-900/80 p-3">
+                        <p className="text-xs font-medium text-slate-300">Password requirements</p>
+                        <ul className="mt-2 space-y-1 text-xs">
+                          {passwordChecklist.map((item) => (
+                            <li
+                              key={item.key}
+                              className={`flex items-center gap-2 ${item.met ? 'text-emerald-300' : 'text-slate-400'}`}
+                            >
+                              <span
+                                aria-hidden
+                                className={`inline-flex h-2 w-2 rounded-full ${item.met ? 'bg-emerald-400' : 'bg-slate-600'}`}
+                              />
+                              <span>{item.label}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    <label className="block space-y-1">
+                      <span className="text-sm font-medium text-slate-200">Confirm new password</span>
+                      <input
+                        type="password"
+                        name="confirm-password"
+                        value={confirmPassword}
+                        onChange={(event) => {
+                          setConfirmPassword(event.target.value);
+                          setPasswordError(null);
+                        }}
+                        className="w-full rounded-md border border-slate-700 bg-slate-950/80 px-3 py-2 text-slate-100 shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                        autoComplete="new-password"
+                        required
+                        disabled={passwordPending}
+                        aria-invalid={showPasswordMismatch || Boolean(passwordError)}
+                      />
+                    </label>
+
+                    {showPasswordMismatch && (
+                      <p className="text-sm text-amber-300" role="alert">
+                        Passwords do not match.
+                      </p>
+                    )}
+
+                    {passwordError && (
+                      <p className="text-sm text-rose-300" role="alert">
+                        {passwordError}
+                      </p>
+                    )}
+
+                    <div className="flex justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={closeChangePassword}
+                        className="rounded-md border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-500 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+                        disabled={passwordPending}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={!canSubmitPassword}
+                        className="rounded-md bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-700"
+                      >
+                        {passwordPending ? 'Updating…' : 'Update password'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            ),
+            document.body,
+          )
+        : null}
 
       {toast && (
         <div className="pointer-events-none fixed right-6 top-6 z-50">

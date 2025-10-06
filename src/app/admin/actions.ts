@@ -85,7 +85,7 @@ async function verifyAdminAccess(existingClient?: SupabaseClient): Promise<Admin
     return { supabase: existingClient ?? null, error: 'Supabase credentials are not configured.' };
   }
 
-  const supabase = existingClient ?? createSupabaseServerActionClient();
+  const supabase = existingClient ?? await createSupabaseServerActionClient();
 
   try {
     await ensureActiveAdmin(supabase);
@@ -105,7 +105,7 @@ export async function authenticateAdmin(prevState: LoginFormState, formData: For
     };
   }
 
-  const supabase = createSupabaseServerActionClient();
+  const supabase = await createSupabaseServerActionClient();
   const ticket = formData.get('mfa_ticket');
 
   if (ticket && typeof ticket === 'string' && ticket.trim().length > 0) {
@@ -201,7 +201,7 @@ export async function logoutAdmin(): Promise<void> {
     return;
   }
 
-  const supabase = createSupabaseServerActionClient();
+  const supabase = await createSupabaseServerActionClient();
   await supabase.auth.signOut({ scope: 'local' });
 }
 
