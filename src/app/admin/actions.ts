@@ -1,20 +1,16 @@
 'use server';
 
-import { cookies } from 'next/headers';
-import { createClient, type PostgrestSingleResponse } from '@supabase/supabase-js';
+import { createClient, type AuthApiError, type PostgrestSingleResponse, type SupabaseClient } from '@supabase/supabase-js';
 import type { AdminStatus, ChurchPublic } from '@/lib/types';
-import {
-  ADMIN_SESSION_COOKIE,
-  ADMIN_SESSION_MAX_AGE,
-  getAdminSessionSignature,
-  isAdminPasswordConfigured,
-  matchesSessionSignature,
-} from '@/lib/adminAuth';
 import { hydrateChurchList, hydrateChurchPublic } from '@/lib/adminChurchHydration';
+import { createSupabaseServerActionClient, isSupabaseConfigured } from '@/lib/supabaseServerClient';
+import { ensureActiveAdmin } from '@/lib/adminSession';
 
 export type LoginFormState = {
   success: boolean;
   error?: string | null;
+  mfaTicket?: string | null;
+  email?: string | null;
 };
 
 export type ChurchUpdatePayload = {
@@ -50,53 +46,12 @@ export type AdminChurchListResult = {
   count: number | null;
 };
 
-const secureCookie = process.env.NODE_ENV === 'production';
+const SESSION_ERROR_MESSAGE = 'You have been signed out. Please log in again.';
 
-export async function authenticateAdmin(_prevState: LoginFormState, formData: FormData): Promise<LoginFormState> {
-  const password = formData.get('password');
-  if (!password || typeof password !== 'string') {
-    return { success: false, error: 'Password is required.' };
-  }
-
-  if (!isAdminPasswordConfigured()) {
-    return { success: false, error: 'Admin password is not configured on this environment.' };
-  }
-
-  const expectedPassword = process.env.ADMIN_PORTAL_PASSWORD as string;
-  if (password !== expectedPassword) {
-    return { success: false, error: 'Incorrect password. Please try again.' };
-  }
-
-  const signature = getAdminSessionSignature();
-  if (!signature) {
-    return { success: false, error: 'Unable to create session signature.' };
-  }
-
-  cookies().set({
-    name: ADMIN_SESSION_COOKIE,
-    value: signature,
-    httpOnly: true,
-    secure: secureCookie,
-    sameSite: 'lax',
-    maxAge: ADMIN_SESSION_MAX_AGE,
-    path: '/',
-  });
-
-  return { success: true };
-}
-
-export async function logoutAdmin(): Promise<void> {
-  cookies().delete(ADMIN_SESSION_COOKIE);
-}
-
-function ensureAuthenticated(): string | null {
-  const sessionCookie = cookies().get(ADMIN_SESSION_COOKIE)?.value;
-  if (!matchesSessionSignature(sessionCookie)) {
-    return 'You have been signed out. Please log in again.';
-  }
-
-  return null;
-}
+type AdminAuthCheck = {
+  supabase: SupabaseClient | null;
+  error: string | null;
+};
 
 function resolveSupabaseCredentials(): { url: string; key: string; table: string } | { error: string } {
   const supabaseUrl = process.env.SUPABASE_URL;
@@ -123,6 +78,139 @@ function createSupabaseAdminClient() {
   });
 
   return { client, table: creds.table };
+}
+
+async function verifyAdminAccess(existingClient?: SupabaseClient): Promise<AdminAuthCheck> {
+  if (!isSupabaseConfigured()) {
+    return { supabase: existingClient ?? null, error: 'Supabase credentials are not configured.' };
+  }
+
+  const supabase = existingClient ?? createSupabaseServerActionClient();
+
+  try {
+    await ensureActiveAdmin(supabase);
+    return { supabase, error: null };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : SESSION_ERROR_MESSAGE;
+    return { supabase, error: message };
+  }
+}
+
+export async function authenticateAdmin(prevState: LoginFormState, formData: FormData): Promise<LoginFormState> {
+  if (!isSupabaseConfigured()) {
+    return {
+      success: false,
+      error: 'Supabase credentials are missing. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.',
+    };
+  }
+
+  const supabase = createSupabaseServerActionClient();
+  const ticket = formData.get('mfa_ticket');
+
+  if (ticket && typeof ticket === 'string' && ticket.trim().length > 0) {
+    const otp = formData.get('otp');
+    if (!otp || typeof otp !== 'string' || otp.trim().length === 0) {
+      return {
+        success: false,
+        error: 'Enter your 6-digit authentication code.',
+        mfaTicket: ticket,
+        email: prevState.email ?? null,
+      };
+    }
+
+    const { error } = await supabase.auth.mfa.verifyOtp({
+      ticket,
+      token: otp.trim(),
+      type: 'totp',
+    });
+
+    if (error) {
+      return {
+        success: false,
+        error: error.message,
+        mfaTicket: ticket,
+        email: prevState.email ?? null,
+      };
+    }
+
+    const { error: membershipError } = await verifyAdminAccess(supabase);
+    if (membershipError) {
+      await supabase.auth.signOut({ scope: 'local' });
+      return {
+        success: false,
+        error: membershipError,
+        email: prevState.email ?? null,
+      };
+    }
+
+    return { success: true, email: prevState.email ?? null };
+  }
+
+  const rawEmail = formData.get('email');
+  const rawPassword = formData.get('password');
+
+  if (!rawEmail || typeof rawEmail !== 'string') {
+    return { success: false, error: 'Email is required.' };
+  }
+
+  if (!rawPassword || typeof rawPassword !== 'string') {
+    return { success: false, error: 'Password is required.', email: rawEmail };
+  }
+
+  const email = rawEmail.trim().toLowerCase();
+  const password = rawPassword;
+
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+  if (error) {
+    const authError = error as AuthApiError;
+    const mfaTicket = (data as { mfa?: { ticket?: string } } | null)?.mfa?.ticket;
+
+    if (authError?.status === 400 && mfaTicket) {
+      return {
+        success: false,
+        error: 'Two-factor authentication required. Enter the code from your authenticator app.',
+        mfaTicket,
+        email,
+      };
+    }
+
+    return {
+      success: false,
+      error: authError?.message ?? 'Unable to sign in with the provided credentials.',
+      email,
+    };
+  }
+
+  const { error: membershipError } = await verifyAdminAccess(supabase);
+  if (membershipError) {
+    await supabase.auth.signOut({ scope: 'local' });
+    return {
+      success: false,
+      error: membershipError,
+      email,
+    };
+  }
+
+  return { success: true, email };
+}
+
+export async function logoutAdmin(): Promise<void> {
+  if (!isSupabaseConfigured()) {
+    return;
+  }
+
+  const supabase = createSupabaseServerActionClient();
+  await supabase.auth.signOut({ scope: 'local' });
+}
+
+async function ensureAuthenticated(): Promise<string | null> {
+  const { error } = await verifyAdminAccess();
+  if (error) {
+    return error;
+  }
+  return null;
 }
 
 function scrubPayload(values: Partial<ChurchPublic>): Record<string, unknown> {
@@ -173,7 +261,7 @@ function mapResponse(
 }
 
 export async function saveChurchChanges(payload: ChurchUpdatePayload): Promise<SaveChurchResult> {
-  const authError = ensureAuthenticated();
+  const authError = await ensureAuthenticated();
   if (authError) {
     return { success: false, error: authError };
   }
@@ -209,7 +297,7 @@ export async function saveChurchChanges(payload: ChurchUpdatePayload): Promise<S
 }
 
 export async function createChurch(payload: CreateChurchPayload): Promise<CreateChurchResult> {
-  const authError = ensureAuthenticated();
+  const authError = await ensureAuthenticated();
   if (authError) {
     return { success: false, error: authError };
   }
@@ -239,7 +327,7 @@ export async function createChurch(payload: CreateChurchPayload): Promise<Create
 }
 
 export async function fetchAdminChurchesByStatus(params: AdminChurchListParams): Promise<AdminChurchListResult> {
-  const authError = ensureAuthenticated();
+  const authError = await ensureAuthenticated();
   if (authError) {
     throw new Error(authError);
   }
@@ -292,7 +380,7 @@ export async function fetchAdminChurchesByStatus(params: AdminChurchListParams):
 }
 
 export async function getAdminChurchById(churchId: string): Promise<ChurchPublic | null> {
-  const authError = ensureAuthenticated();
+  const authError = await ensureAuthenticated();
   if (authError) {
     throw new Error(authError);
   }
