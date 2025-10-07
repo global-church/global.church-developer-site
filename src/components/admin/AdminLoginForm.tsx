@@ -3,6 +3,7 @@
 import { useActionState, useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { authenticateAdmin, type LoginFormState } from '@/app/admin/actions';
+import { useSupabaseBrowserClient } from '@/hooks/useSupabaseBrowserClient';
 
 const initialState: LoginFormState = { success: false, error: null, mfaTicket: null, email: null };
 
@@ -14,11 +15,15 @@ type AdminLoginFormProps = {
 
 export function AdminLoginForm({ supabaseConfigured, initialEmail, membershipError }: AdminLoginFormProps) {
   const router = useRouter();
+  const supabase = useSupabaseBrowserClient();
   const [state, formAction, actionPending] = useActionState(authenticateAdmin, initialState);
   const [transitionPending, startTransition] = useTransition();
   const [email, setEmail] = useState(initialEmail ?? '');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
+  const [forgotPasswordPending, setForgotPasswordPending] = useState(false);
+  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState(false);
+  const [forgotPasswordError, setForgotPasswordError] = useState<string | null>(null);
 
   useEffect(() => {
     if (state.email && state.email !== email) {
@@ -49,6 +54,35 @@ export function AdminLoginForm({ supabaseConfigured, initialEmail, membershipErr
       router.refresh();
     });
   }, [router, startTransition]);
+
+  const handleForgotPassword = useCallback(async () => {
+    if (!email || !email.trim()) {
+      setForgotPasswordError('Please enter your email address first.');
+      return;
+    }
+
+    setForgotPasswordPending(true);
+    setForgotPasswordError(null);
+    setForgotPasswordSuccess(false);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        setForgotPasswordError(error.message || 'Unable to send reset email. Please try again.');
+        setForgotPasswordPending(false);
+        return;
+      }
+
+      setForgotPasswordSuccess(true);
+      setForgotPasswordPending(false);
+    } catch (err) {
+      setForgotPasswordError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+      setForgotPasswordPending(false);
+    }
+  }, [email, supabase]);
 
   const disabled = !supabaseConfigured || actionPending || transitionPending;
   const submitLabel = requiresOtp ? 'Verify Code' : 'Sign In';
@@ -105,6 +139,29 @@ export function AdminLoginForm({ supabaseConfigured, initialEmail, membershipErr
               required={!requiresOtp}
             />
           </label>
+
+          {!requiresOtp && (
+            <div className="text-right">
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={forgotPasswordPending || !supabaseConfigured}
+                className="text-sm text-sky-400 transition hover:text-sky-300 disabled:cursor-not-allowed disabled:text-slate-500"
+              >
+                {forgotPasswordPending ? 'Sending...' : 'Forgot your password?'}
+              </button>
+            </div>
+          )}
+
+          {forgotPasswordSuccess && (
+            <p className="text-sm text-emerald-400">
+              If an admin account exists with that email, a password reset email will be sent. Check your inbox and follow the link to reset your password.
+            </p>
+          )}
+
+          {forgotPasswordError && (
+            <p className="text-sm text-rose-400">{forgotPasswordError}</p>
+          )}
 
           {requiresOtp && (
             <label className="block space-y-1">
