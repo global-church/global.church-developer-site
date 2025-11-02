@@ -21,7 +21,7 @@ export default function Page() {
         {/* Overlayed text + buttons (constrained) */}
         <div className="container mx-auto px-4 text-center relative z-10">
           <h1 className="text-5xl md:text-6xl leading-tight font-bold tracking-tight text-gray-900">
-            Uniting the Global Church,<br />one API at a time.
+            The backbone of a connected Church.
           </h1>
           <p className="mt-4 text-lg text-gray-600 max-w-3xl mx-auto mb-0">
             We&#39;re building an open-source data schema and powerful APIs to help developers connect the global body of Christ.
