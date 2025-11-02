@@ -2,7 +2,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import ContentPage from '@/components/ContentPage';
 
 interface Message {
@@ -344,8 +343,7 @@ curl -s -X POST "${MCP_URL}" \
         </ul>
 
         <p className="text-sm text-gray-600">
-          Questions? <Link href="/contact" className="underline">Get in touch</Link>. Want to contribute? See our roadmap and
-          open issues.
+          Want to contribute? See our roadmap and open issues.
         </p>
       </div>
     </ContentPage>

@@ -92,17 +92,10 @@ export default function SecurityPage() {
         <Separator />
 
         <section className="text-center">
-          <h2 className="text-3xl font-bold tracking-tight">Contact Us</h2>
+          <h2 className="text-3xl font-bold tracking-tight">Questions?</h2>
           <p className="mt-4 text-muted-foreground">
-            If you have any questions about our security or privacy practices, please do not hesitate to reach out.
+            If you have any questions about our security or privacy practices, please submit feedback through our <Link href="/feedback" className="underline">feedback form</Link>.
           </p>
-          <div className="mt-6">
-            <Link href="/contact" passHref>
-              <button className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
-                Contact Support
-              </button>
-            </Link>
-          </div>
         </section>
       </div>
     </ContentPage>

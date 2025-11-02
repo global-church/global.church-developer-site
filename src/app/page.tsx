@@ -140,16 +140,6 @@ export default function Page() {
             A shared data standard for the FaithTech community,<br />
             by the FaithTech community 💙
           </h2>
-          <div className="container mx-auto px-4 mt-16 md:mt-24 mb-0 md:mb-12 relative z-20">
-          <div className="mt-24 md:mt-28 flex justify-center gap-4">
-            <Button asChild size="lg">
-              <Link href="/explorer">Learn More</Link>
-            </Button>
-            <Button asChild variant="outline" size="lg">
-              <Link href="/schema">Connect With Us</Link>
-            </Button>
-          </div>
-        </div>
         </div>
       </section>
     </div>

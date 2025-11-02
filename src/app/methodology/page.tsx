@@ -58,7 +58,6 @@ export default function MethodologyPage() {
       </p>
       <ul className="my-5">
         <li>Submit feedback at <Link href="/feedback">/feedback</Link>.</li>
-        <li>General inquiries at <Link href="/contact">/contact</Link>.</li>
         <li>For API access requests, visit <Link href="/request-access">/request-access</Link>.</li>
       </ul>
 

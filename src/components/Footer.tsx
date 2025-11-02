@@ -31,7 +31,6 @@ export default function Footer() {
               <li><Link className="hover:text-gray-900" href="/request-access">Request Access</Link></li>
               <li><Link className="hover:text-gray-900" href="/feedback">Feedback</Link></li>
               <li><Link className="hover:text-gray-900" href="/faq">FAQs</Link></li>
-              <li><Link className="hover:text-gray-900" href="/contact">Contact</Link></li>
             </ul>
           </div>
 
