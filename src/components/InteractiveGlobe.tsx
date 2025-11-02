@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, useImperativeHandle, forwardRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Minus } from 'lucide-react';
 import Globe, { type GlobeMethods } from 'react-globe.gl';
@@ -13,9 +13,6 @@ import { searchChurchesGeoJSON } from '@/lib/zuplo';
 // Globe zoom limits (altitude). Tweak these to adjust min/max zoom.
 const MIN_GLOBE_ALTITUDE = 1.7; // closer (zoomed in)
 const MAX_GLOBE_ALTITUDE = 3;   // farther (zoomed out)
-// Scroll zoom tuning
-const WHEEL_ZOOM_SENSITIVITY = 0.007; // higher = faster zoom per tick (default was 0.0015)
-const WHEEL_ZOOM_ANIM_MS = 120;        // shorter animation for snappier response (was 200)
 
 type ChurchPoint = {
   lat: number;
@@ -28,7 +25,12 @@ type ChurchPoint = {
   belief?: string | null; // belief_type
 };
 
-export default function InteractiveGlobe({ colorMode = 'country' }: { colorMode?: 'country' | 'belief' }) {
+export interface GlobeHandle {
+  zoomIn: () => void;
+  zoomOut: () => void;
+}
+
+const InteractiveGlobe = forwardRef<GlobeHandle, { colorMode?: 'country' | 'belief' }>(({ colorMode = 'country' }, ref) => {
   const router = useRouter();
   const globeRef = useRef<GlobeMethods>(null!);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -38,10 +40,14 @@ export default function InteractiveGlobe({ colorMode = 'country' }: { colorMode?
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const hoveredPoint = useMemo(() => churchPoints.find(p => p.id === hoveredId) || null, [churchPoints, hoveredId]);
   const [globeReady, setGlobeReady] = useState(false);
-  // removed unused ref from earlier iteration
+  const hasFetchedData = useRef(false);
 
   // Fetch data and set initial globe view
   useEffect(() => {
+    // Prevent duplicate fetches in React Strict Mode
+    if (hasFetchedData.current) return;
+    hasFetchedData.current = true;
+
     fetch('/custom.geo.json')
       .then((res) => res.json())
       .then(setCountries)
@@ -95,59 +101,13 @@ export default function InteractiveGlobe({ colorMode = 'country' }: { colorMode?
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.enablePan = false;
-    controls.enableZoom = true; // allow zoom via buttons (and wheel if desired)
+    controls.enableZoom = false; // disable zoom to prevent interference with page scroll
     controls.enableRotate = true; // ensure user can spin the globe
 
     const stopOnStart = () => { controls.autoRotate = false; };
     controls.addEventListener?.('start', stopOnStart);
 
-    // Desktop-only: reverse wheel zoom direction (scroll down zooms in)
-    const isDesktop = typeof window !== 'undefined'
-      && window.matchMedia?.('(pointer: fine)').matches
-      && !('ontouchstart' in window);
-
-    let wheelHandler: ((e: WheelEvent) => void) | null = null;
-    let prevEnableZoom: boolean | null = null;
-    let domEl: HTMLElement | null = null;
-    if (isDesktop) {
-      // Disable OrbitControls wheel zoom to avoid double handling
-      prevEnableZoom = controls.enableZoom;
-      controls.enableZoom = false;
-
-      const renderer = (globe as unknown as { renderer?: () => THREE.WebGLRenderer }).renderer?.();
-      domEl = renderer?.domElement || (containerRef.current as unknown as HTMLElement | null);
-
-      if (domEl) {
-        wheelHandler = (e: WheelEvent) => {
-          // Reverse: positive deltaY (scroll down) should zoom IN (decrease altitude)
-          const pov = (globe.pointOfView() as unknown as { lat: number; lng: number; altitude: number }) || { lat: 0, lng: 0, altitude: MAX_GLOBE_ALTITUDE };
-          const currentAlt = pov.altitude;
-
-          const delta = e.deltaY;
-          if (!Number.isFinite(delta) || delta === 0) return; // let it bubble
-
-          const scale = Math.exp(Math.abs(delta) * WHEEL_ZOOM_SENSITIVITY);
-
-          // If delta > 0 (scroll down) => zoom in => smaller altitude
-          const nextAlt = delta > 0 ? currentAlt / scale : currentAlt * scale;
-          const clamped = Math.max(MIN_GLOBE_ALTITUDE, Math.min(MAX_GLOBE_ALTITUDE, nextAlt));
-
-          // If clamped equals currentAltitude and user is pushing further in same direction, allow page scroll
-          const pushingIn = delta > 0; // towards MIN
-          const pushingOut = delta < 0; // towards MAX
-          const atMin = currentAlt <= MIN_GLOBE_ALTITUDE + 1e-4;
-          const atMax = currentAlt >= MAX_GLOBE_ALTITUDE - 1e-4;
-          if ((atMin && pushingIn) || (atMax && pushingOut) || clamped === currentAlt) {
-            return; // do not prevent default; let page handle scroll
-          }
-
-          e.preventDefault();
-          e.stopPropagation();
-          globe.pointOfView({ lat: pov.lat, lng: pov.lng, altitude: clamped }, WHEEL_ZOOM_ANIM_MS);
-        };
-        domEl.addEventListener('wheel', wheelHandler, { passive: false });
-      }
-    }
+    // Zoom disabled - no wheel handler needed
 
     let rafId = 0;
     const tick = () => {
@@ -158,12 +118,6 @@ export default function InteractiveGlobe({ colorMode = 'country' }: { colorMode?
 
     return () => {
       controls.removeEventListener?.('start', stopOnStart);
-      if (wheelHandler && domEl) {
-        domEl.removeEventListener('wheel', wheelHandler as EventListener);
-      }
-      if (prevEnableZoom !== null) {
-        controls.enableZoom = prevEnableZoom;
-      }
       cancelAnimationFrame(rafId);
     };
   }, [globeReady]);
@@ -190,6 +144,12 @@ export default function InteractiveGlobe({ colorMode = 'country' }: { colorMode?
     const pov = (globe.pointOfView() as unknown as { altitude: number }) || { altitude: MAX_GLOBE_ALTITUDE };
     zoomToAltitude(pov.altitude * 1.25);
   };
+
+  // Expose zoom methods to parent component
+  useImperativeHandle(ref, () => ({
+    zoomIn: handleZoomIn,
+    zoomOut: handleZoomOut,
+  }));
 
   // Handle resizing the globe to fit its container
   useEffect(() => {
@@ -249,6 +209,7 @@ export default function InteractiveGlobe({ colorMode = 'country' }: { colorMode?
     >
       {/* Only render the Globe component if data is loaded and dimensions are set */}
       {countries.features.length > 0 && dimensions.width > 0 && (
+        <>
         <Globe
           ref={globeRef}
           onGlobeReady={() => setGlobeReady(true)}
@@ -303,26 +264,31 @@ export default function InteractiveGlobe({ colorMode = 'country' }: { colorMode?
             return el;
           }}
         />
+        {/* Zoom Controls */}
+        <div className="pointer-events-auto absolute right-3 top-3 flex flex-col gap-2 z-50">
+          <button
+            type="button"
+            onClick={handleZoomIn}
+            aria-label="Zoom in"
+            className="rounded-full bg-white/80 text-gray-900 shadow-lg ring-1 ring-white/50 hover:bg-white backdrop-blur px-2 py-2 transition-transform hover:scale-105"
+          >
+            <Plus size={18} />
+          </button>
+          <button
+            type="button"
+            onClick={handleZoomOut}
+            aria-label="Zoom out"
+            className="rounded-full bg-white/80 text-gray-900 shadow-lg ring-1 ring-white/50 hover:bg-white backdrop-blur px-2 py-2 transition-transform hover:scale-105"
+          >
+            <Minus size={18} />
+          </button>
+        </div>
+        </>
       )}
-      {/* Zoom Controls */}
-      <div className="pointer-events-auto absolute right-3 top-3 flex flex-col gap-2">
-        <button
-          type="button"
-          onClick={handleZoomIn}
-          aria-label="Zoom in"
-          className="rounded-full bg-white/80 text-gray-900 shadow-lg ring-1 ring-white/50 hover:bg-white backdrop-blur px-2 py-2 transition-transform hover:scale-105"
-        >
-          <Plus size={18} />
-        </button>
-        <button
-          type="button"
-          onClick={handleZoomOut}
-          aria-label="Zoom out"
-          className="rounded-full bg-white/80 text-gray-900 shadow-lg ring-1 ring-white/50 hover:bg-white backdrop-blur px-2 py-2 transition-transform hover:scale-105"
-        >
-          <Minus size={18} />
-        </button>
-      </div>
     </div>
   );
-}
+});
+
+InteractiveGlobe.displayName = 'InteractiveGlobe';
+
+export default InteractiveGlobe;
