@@ -28,7 +28,7 @@ export default function SchemaPage() {
             <p className="text-gray-600 mt-2 mb-6">
               View the complete, versioned schema documentation, including all types and fields, hosted on GitHub Pages.
             </p>
-            <Link href="https://trentsikute.github.io/globalchurch-schema/" target="_blank" rel="noopener noreferrer">
+            <Link href="https://global-church.github.io/globalchurch-schema/" target="_blank" rel="noopener noreferrer">
               <Button size="lg" className="w-full">
                 View the Schema
                 <ExternalLink className="ml-2 size-4" />

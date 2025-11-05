@@ -1,6 +1,6 @@
 # Global.Church Index - Developer Showcase
 
-This Next.js application serves as the primary developer showcase and interactive explorer for the Global.Church platform. It demonstrates the capabilities of the open-source [Global.Church Schema](https://trentsikute.github.io/globalchurch-schema/) and the accompanying [Church Database API](https://global-church-main-ba4d06e.zuplo.site).
+This Next.js application serves as the primary developer showcase and interactive explorer for the Global.Church platform. It demonstrates the capabilities of the open-source [Global.Church Schema](https://global-church.github.io/globalchurch-schema/) and the accompanying [Church Database API](https://global-church-main-ba4d06e.zuplo.site).
 
 ## Overview
 
