@@ -56,7 +56,6 @@ export default function ServiceDayFilter() {
     params.delete('service_days')
     const qs = params.toString()
     router.push(qs ? `${pathname}?${qs}` : pathname)
-    setOpen(false)
   }
 
   // Close on outside click – apply current selection

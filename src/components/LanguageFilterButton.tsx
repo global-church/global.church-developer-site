@@ -79,7 +79,6 @@ export default function LanguageFilterButton() {
     params.delete('language')
     const qs = params.toString()
     router.push(qs ? `${pathname}?${qs}` : pathname)
-    setOpen(false)
   }
 
   const count = selected.size
