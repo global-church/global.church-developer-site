@@ -73,7 +73,6 @@ export default function BeliefFilterButton() {
     params.delete('belief')
     const qs = params.toString()
     router.push(qs ? `${pathname}?${qs}` : pathname)
-    setOpen(false)
   }
 
   function selectAll() {

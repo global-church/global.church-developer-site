@@ -116,7 +116,6 @@ export default function DenominationFilter() {
     params.delete('denomination')
     const qs = params.toString()
     router.push(qs ? `${pathname}?${qs}` : pathname)
-    setOpen(false)
   }
 
   const count = selected.size
