@@ -67,7 +67,8 @@ export async function POST(req: NextRequest) {
     }
 
     const RESEND_API_KEY = process.env.RESEND_API_KEY
-    const TO = process.env.FEEDBACK_RECIPIENT || process.env.REQUEST_ACCESS_RECIPIENT || 'trent.sikute@global.church'
+    const TO_RAW = process.env.FEEDBACK_RECIPIENT || process.env.REQUEST_ACCESS_RECIPIENT || 'trent.sikute@global.church'
+    const TO = TO_RAW.split(',').map(email => email.trim()).filter(email => email.length > 0)
     const FROM = process.env.EMAIL_FROM || 'Global Church <no-reply@global.church>'
 
     if (!RESEND_API_KEY) {
@@ -141,7 +142,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         from: FROM,
-        to: [TO],
+        to: TO,
         subject,
         html,
         text,
