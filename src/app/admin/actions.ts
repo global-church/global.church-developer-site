@@ -283,7 +283,7 @@ export async function saveChurchChanges(payload: ChurchUpdatePayload): Promise<S
 
   try {
     const response = await client
-      .from<ChurchPublic>(table)
+      .from(table)
       .update(updates)
       .eq('church_id', payload.churchId)
       .select()
@@ -314,7 +314,7 @@ export async function createChurch(payload: CreateChurchPayload): Promise<Create
 
   try {
     const response = await client
-      .from<ChurchPublic>(table)
+      .from(table)
       .insert(values)
       .select()
       .maybeSingle();
