@@ -23,6 +23,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseBrowserClient } from '@/hooks/useSupabaseBrowserClient';
 
+export const dynamic = 'force-dynamic';
+
 type RecoveryTokens = {
   accessToken: string;
   refreshToken: string;

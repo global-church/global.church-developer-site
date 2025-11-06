@@ -14,12 +14,12 @@ type AdminListResponse = AdminMembership[] | null;
 
 export async function listAdmins(client: SupabaseClient): Promise<AdminMembership[]> {
   const adminSchema = client.schema('api');
-  const { data, error } = await adminSchema.rpc<AdminListResponse>('admins_list');
+  const { data, error } = await adminSchema.rpc('admins_list');
   if (error) {
     throw new Error(error.message);
   }
 
-  return data ?? [];
+  return (data as AdminListResponse) ?? [];
 }
 
 export async function getCurrentAdmin(client: SupabaseClient): Promise<AdminMembership | null> {

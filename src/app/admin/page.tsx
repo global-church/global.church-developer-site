@@ -3,6 +3,8 @@ import { AdminLoginForm } from '@/components/admin/AdminLoginForm';
 import { createSupabaseServerComponentClient, isSupabaseConfigured } from '@/lib/supabaseServerClient';
 import { getCurrentAdmin } from '@/lib/adminSession';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminPage() {
   const supabaseConfigured = isSupabaseConfigured();
 

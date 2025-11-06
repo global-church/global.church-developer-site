@@ -13,14 +13,14 @@ type CookieStore = Awaited<ReturnType<typeof cookies>>;
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-function assertSupabaseEnv(): asserts supabaseUrl is string & { length: number } {
-  if (!supabaseUrl) {
+function assertSupabaseEnv(url: string | undefined): asserts url is string {
+  if (!url) {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable.');
   }
 }
 
-function assertSupabaseKey(): asserts supabaseAnonKey is string & { length: number } {
-  if (!supabaseAnonKey) {
+function assertSupabaseKey(key: string | undefined): asserts key is string {
+  if (!key) {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable.');
   }
 }
@@ -48,8 +48,8 @@ function buildCookieAdapter(store: CookieStore, mutable: boolean): CookieAccesso
 }
 
 function ensureSupabaseConfig(): { url: string; key: string } {
-  assertSupabaseEnv();
-  assertSupabaseKey();
+  assertSupabaseEnv(supabaseUrl);
+  assertSupabaseKey(supabaseAnonKey);
   return { url: supabaseUrl, key: supabaseAnonKey };
 }
 
