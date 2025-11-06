@@ -119,10 +119,10 @@ export async function authenticateAdmin(prevState: LoginFormState, formData: For
       };
     }
 
-    const { error } = await supabase.auth.mfa.verifyOtp({
-      ticket,
-      token: otp.trim(),
-      type: 'totp',
+    const { error } = await supabase.auth.mfa.verify({
+      factorId: ticket,
+      challengeId: ticket,
+      code: otp.trim(),
     });
 
     if (error) {

@@ -7,12 +7,14 @@ import { Button } from "@/components/ui/button";
 import FeatureCard from "@/components/FeatureCard";
 import { FileText, Code, Lock } from "lucide-react";
 import GlobeLoader from "@/components/GlobeLoader";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Flag, Church } from "lucide-react";
+import type { GlobeHandle } from "@/components/InteractiveGlobe";
 
 
 export default function Page() {
-  const [globeColorMode, setGlobeColorMode] = useState<'country' | 'belief'>('country');
+  const [globeColorMode, setGlobeColorMode] = useState<'country' | 'belief'>('belief');
+  const globeRef = useRef<GlobeHandle>(null);
 
   return (
     <div>
@@ -26,21 +28,9 @@ export default function Page() {
           <p className="mt-4 text-lg text-gray-600 max-w-3xl mx-auto mb-0">
             We&#39;re building an open-source data schema and powerful APIs to help developers connect the global body of Christ.
           </p>
-        </div>
 
-        {/* Create a large spacer where the globe sits, center globe in it */}
-        <div className="relative">
-          <div className="h-[520px] md:h-[720px]" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            {/* Full-bleed globe centered in the spacer; can extend beyond without clipping */}
-            <GlobeLoader colorMode={globeColorMode} />
-          </div>
-        </div>
-
-        {/* CTA buttons stay constrained under the globe */}
-        <div className="container mx-auto px-4 mt-16 md:mt-24 mb-0 md:mb-12 relative z-20">
-          {/* Globe color mode toggle */}
-          <div className="flex justify-center">
+          {/* Globe color mode toggle - moved above globe */}
+          <div className="flex justify-center mt-8">
             <div role="group" aria-label="Globe color mode" className="inline-flex items-center rounded-full bg-white/80 backdrop-blur shadow ring-1 ring-white/50 overflow-hidden">
               <button
                 type="button"
@@ -64,7 +54,8 @@ export default function Page() {
               </button>
             </div>
           </div>
-          {/* Belief legend (only when belief mode is selected) */}
+
+          {/* Belief legend (only when belief mode is selected) - moved above globe */}
           {globeColorMode === 'belief' && (
             <div className="mt-3 flex justify-center">
               <ul className="flex items-center gap-4 bg-white/80 backdrop-blur rounded-full px-4 py-2 shadow ring-1 ring-white/50">
@@ -88,6 +79,38 @@ export default function Page() {
               </ul>
             </div>
           )}
+        </div>
+
+        {/* Create a large spacer where the globe sits, center globe in it */}
+        <div className="relative overflow-visible">
+          <div className="h-[520px] md:h-[720px]" />
+          <div className="absolute inset-0 flex items-center justify-center overflow-visible">
+            {/* Full-bleed globe centered in the spacer; can extend beyond without clipping */}
+            <GlobeLoader ref={globeRef} colorMode={globeColorMode} />
+            {/* Zoom controls positioned relative to the globe center */}
+            <div className="absolute right-4 top-4 md:right-[calc(50%-400px)] md:top-[calc(50%-350px)] flex flex-col gap-2 z-50 pointer-events-auto">
+              <button
+                type="button"
+                onClick={() => globeRef.current?.zoomIn()}
+                aria-label="Zoom in"
+                className="rounded-full bg-white/80 text-gray-900 shadow-lg ring-1 ring-white/50 hover:bg-white backdrop-blur px-2 py-2 transition-transform hover:scale-105"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => globeRef.current?.zoomOut()}
+                aria-label="Zoom out"
+                className="rounded-full bg-white/80 text-gray-900 shadow-lg ring-1 ring-white/50 hover:bg-white backdrop-blur px-2 py-2 transition-transform hover:scale-105"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* CTA buttons stay constrained under the globe */}
+        <div className="container mx-auto px-4 mt-16 md:mt-24 mb-0 md:mb-12 relative z-20">
           <div className="mt-8 md:mt-10 flex justify-center gap-4">
             <Button asChild size="lg">
               <Link href="/explorer">Explore Churches</Link>
