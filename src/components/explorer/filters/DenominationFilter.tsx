@@ -59,11 +59,11 @@ export default function DenominationFilter() {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const router = useRouter()
   const sp = useSearchParams()
-  const pathname = usePathname()
+  const pathname = usePathname() ?? '/'
 
   // Sync from URL
   useEffect(() => {
-    const raw = sp.get('denomination') || ''
+    const raw = sp?.get('denomination') || ''
     const next = new Set<DenominationValue>()
     raw.split(',').map((s) => s.trim()).forEach((s) => {
       const match = (DENOMINATION_OPTIONS as readonly string[]).find((opt) => opt.toLowerCase() === s.toLowerCase())
@@ -79,7 +79,7 @@ export default function DenominationFilter() {
   }, [query])
 
   const apply = useCallback(() => {
-    const params = new URLSearchParams(sp.toString())
+    const params = new URLSearchParams(sp?.toString() ?? '')
     const csv = Array.from(selected).join(',')
     if (csv) params.set('denomination', csv)
     else params.delete('denomination')
@@ -112,7 +112,7 @@ export default function DenominationFilter() {
 
   function clear() {
     setSelected(new Set())
-    const params = new URLSearchParams(sp.toString())
+    const params = new URLSearchParams(sp?.toString() ?? '')
     params.delete('denomination')
     const qs = params.toString()
     router.push(qs ? `${pathname}?${qs}` : pathname)

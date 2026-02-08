@@ -12,13 +12,13 @@ export default function ServiceTimeFilter() {
   const [start, setStart] = useState<string>('08:00')
   const [end, setEnd] = useState<string>('10:00')
   const router = useRouter()
-  const pathname = usePathname()
+  const pathname = usePathname() ?? '/'
   const sp = useSearchParams()
 
   // sync from URL
   useEffect(() => {
-    const s = sp.get('service_time_start') || ''
-    const e = sp.get('service_time_end') || ''
+    const s = sp?.get('service_time_start') || ''
+    const e = sp?.get('service_time_end') || ''
     // Only override defaults if URL explicitly provides values
     if (s) setStart(s)
     if (e) setEnd(e)
@@ -26,7 +26,7 @@ export default function ServiceTimeFilter() {
 
   // Apply changes only when user clicks Apply
   function applyToUrl() {
-    const params = new URLSearchParams(sp.toString())
+    const params = new URLSearchParams(sp?.toString() ?? '')
     if (start) params.set('service_time_start', start)
     else params.delete('service_time_start')
     if (end) params.set('service_time_end', end)
@@ -49,7 +49,7 @@ export default function ServiceTimeFilter() {
   }, [open])
 
   // Badge active when URL has any service time filters applied
-  const active = Boolean(sp.get('service_time_start') || sp.get('service_time_end'))
+  const active = Boolean(sp?.get('service_time_start') || sp?.get('service_time_end'))
 
   return (
     <div className="relative" ref={containerRef}>
@@ -76,7 +76,7 @@ export default function ServiceTimeFilter() {
               onClick={() => {
                 setStart('')
                 setEnd('')
-                const params = new URLSearchParams(sp.toString())
+                const params = new URLSearchParams(sp?.toString() ?? '')
                 params.delete('service_time_start')
                 params.delete('service_time_end')
                 const qs = params.toString()

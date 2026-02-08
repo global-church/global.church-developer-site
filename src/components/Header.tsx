@@ -23,7 +23,7 @@ export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [clientRoles, setClientRoles] = useState<string[]>([]);
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '/';
   const router = useRouter();
   const { user, loading } = useSession();
   const supabase = useSupabaseBrowserClient();

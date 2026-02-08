@@ -19,11 +19,11 @@ export default function LanguageFilterButton() {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const router = useRouter()
   const sp = useSearchParams()
-  const pathname = usePathname()
+  const pathname = usePathname() ?? '/'
 
   // Sync from URL
   useEffect(() => {
-    const raw = sp.get('language') || ''
+    const raw = sp?.get('language') || ''
     const next = new Set<LanguageValue>()
     raw.split(',').map((s) => s.trim()).forEach((s) => {
       const match = (LANGUAGE_OPTIONS as readonly string[]).find((opt) => opt.toLowerCase() === s.toLowerCase())
@@ -40,7 +40,7 @@ export default function LanguageFilterButton() {
 
   // Apply current selection to URL (declare before effects that depend on it)
   const apply = useCallback(() => {
-    const params = new URLSearchParams(sp.toString())
+    const params = new URLSearchParams(sp?.toString() ?? '')
     const csv = Array.from(selected).join(',')
     if (csv) params.set('language', csv)
     else params.delete('language')
@@ -75,7 +75,7 @@ export default function LanguageFilterButton() {
 
   function clear() {
     setSelected(new Set())
-    const params = new URLSearchParams(sp.toString())
+    const params = new URLSearchParams(sp?.toString() ?? '')
     params.delete('language')
     const qs = params.toString()
     router.push(qs ? `${pathname}?${qs}` : pathname)

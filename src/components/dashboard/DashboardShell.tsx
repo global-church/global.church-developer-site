@@ -22,7 +22,7 @@ export function DashboardShell({
   session: UserSession;
   children: ReactNode;
 }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '/';
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const switcherRef = useRef<HTMLDivElement>(null);

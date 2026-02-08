@@ -27,7 +27,7 @@ export function AdminSidebar({
   session: UserSession;
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '/';
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const switcherRef = useRef<HTMLDivElement>(null);

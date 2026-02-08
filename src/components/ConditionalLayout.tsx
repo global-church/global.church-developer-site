@@ -8,7 +8,7 @@ import Footer from '@/components/Footer';
 const SIDEBAR_PREFIXES = ['/dashboard', '/admin'];
 
 export function ConditionalLayout({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '/';
   const hasSidebar = SIDEBAR_PREFIXES.some((p) => pathname.startsWith(p));
 
   return (

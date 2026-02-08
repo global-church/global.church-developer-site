@@ -92,9 +92,9 @@ export default function ExplorerClient() {
   const [radiusKm, setRadiusKm] = useState(25);
   const [unit, setUnit] = useState<"km" | "mi">("km");
   const sp = useSearchParams();
-  const spKey = sp.toString();
+  const spKey = sp?.toString() ?? '';
   const router = useRouter();
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '/';
   const nameFromParams = useMemo(() => {
     const params = new URLSearchParams(spKey);
     return params.get('name') ?? '';
@@ -514,19 +514,19 @@ const formatDenomination = (denom?: string | null) => {
   const canLoadMore = searchMode === 'nearby' ? nearbyMeta.hasMore : serverMeta.hasMore;
 
   const selectedServiceDays = useMemo(() => {
-    const raw = sp.get('service_days') || '';
+    const raw = sp?.get('service_days') || '';
     const set = new Set(raw.split(',').map((s) => s.trim()).filter(Boolean));
     return set;
   }, [sp]);
 
   const resultsFiltered: NearbyChurch[] = useMemo(() => {
-    const startParam = sp.get('service_time_start');
-    const endParam = sp.get('service_time_end');
+    const startParam = sp?.get('service_time_start');
+    const endParam = sp?.get('service_time_end');
     const startM = parseTimeParam(startParam);
     const endM = parseTimeParam(endParam);
 
     // Denomination filter (CSV list)
-    const denomCsv = sp.get('denomination') || '';
+    const denomCsv = sp?.get('denomination') || '';
     const denomSelected = denomCsv
       .split(',')
       .map((s) => s.trim())
@@ -833,8 +833,8 @@ const formatDenomination = (denom?: string | null) => {
               if (selectedServiceDays.size > 0) {
                 times = times.filter((t) => selectedServiceDays.has(t.day));
               }
-              const startM = parseTimeParam(sp.get('service_time_start'));
-              const endM = parseTimeParam(sp.get('service_time_end'));
+              const startM = parseTimeParam(sp?.get('service_time_start'));
+              const endM = parseTimeParam(sp?.get('service_time_end'));
               if (startM != null || endM != null) {
                 times = times.filter((t) => inTimeRange(((t.minutes % 1440) + 1440) % 1440, startM, endM));
               }

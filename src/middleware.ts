@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { createSupabaseMiddlewareClient } from '@/lib/supabaseServerClient';
+import { createSupabaseMiddlewareClient, isSupabaseConfigured } from '@/lib/supabaseServerClient';
 
 const PUBLIC_PATHS = new Set([
   '/',
@@ -29,6 +29,11 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/') ||
     pathname.includes('.')
   ) {
+    return response;
+  }
+
+  // If Supabase is not configured, skip auth checks entirely
+  if (!isSupabaseConfigured()) {
     return response;
   }
 
