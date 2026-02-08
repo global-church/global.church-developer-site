@@ -10,12 +10,12 @@ export default function ProgramsFilter() {
   const [debounced, setDebounced] = useState('')
   const ref = useRef<HTMLInputElement | null>(null)
   const router = useRouter()
-  const pathname = usePathname()
+  const pathname = usePathname() ?? '/'
   const sp = useSearchParams()
 
   // sync from URL on mount/changes
   useEffect(() => {
-    const current = sp.get('programs') || ''
+    const current = sp?.get('programs') || ''
     setValue(current)
     setDebounced(current)
   }, [sp])
@@ -28,7 +28,7 @@ export default function ProgramsFilter() {
 
   // push to URL as programs
   useEffect(() => {
-    const params = new URLSearchParams(sp.toString())
+    const params = new URLSearchParams(sp?.toString() ?? '')
     const v = debounced.trim()
     if (v) params.set('programs', v)
     else params.delete('programs')

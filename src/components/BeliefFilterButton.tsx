@@ -23,11 +23,11 @@ export default function BeliefFilterButton() {
   const [selected, setSelected] = useState<Set<BeliefValue>>(new Set((BELIEF_OPTIONS as readonly { value: string; label: string }[]).map(o => o.value as BeliefValue)))
   const router = useRouter()
   const sp = useSearchParams()
-  const pathname = usePathname()
+  const pathname = usePathname() ?? '/'
 
   // Sync from current URL (default to all selected when absent)
   useEffect(() => {
-    const raw = sp.get('belief') || ''
+    const raw = sp?.get('belief') || ''
     const next = new Set<BeliefValue>()
     const parts = raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
     if (parts.length === 0) {
@@ -53,7 +53,7 @@ export default function BeliefFilterButton() {
   }
 
   const apply = useCallback(() => {
-    const params = new URLSearchParams(sp.toString())
+    const params = new URLSearchParams(sp?.toString() ?? '')
     const allValues = (BELIEF_OPTIONS as readonly { value: string; label: string }[]).map(o => o.value)
     const selectedValues = Array.from(selected)
     const isAll = selectedValues.length === allValues.length
@@ -61,7 +61,8 @@ export default function BeliefFilterButton() {
     if (csv && !isAll) params.set('belief', csv)
     else params.delete('belief')
     const qs = params.toString()
-    router.push(qs ? `${pathname}?${qs}` : pathname)
+    const path = pathname ?? '/'
+    router.push(qs ? `${path}?${qs}` : path)
     setOpen(false)
   }, [pathname, router, selected, sp])
 
@@ -69,10 +70,11 @@ export default function BeliefFilterButton() {
   // expose "Clear" in the UI so the function is used and lint stays clean
   const clear = () => {
     setSelected(new Set())
-    const params = new URLSearchParams(sp.toString())
+    const params = new URLSearchParams(sp?.toString() ?? '')
     params.delete('belief')
     const qs = params.toString()
-    router.push(qs ? `${pathname}?${qs}` : pathname)
+    const path = pathname ?? '/'
+    router.push(qs ? `${path}?${qs}` : path)
   }
 
   function selectAll() {

@@ -20,12 +20,12 @@ export default function ServiceDayFilter() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const containerRef = useRef<HTMLDivElement | null>(null)
   const router = useRouter()
-  const pathname = usePathname()
+  const pathname = usePathname() ?? '/'
   const sp = useSearchParams()
 
   // Sync from URL
   useEffect(() => {
-    const raw = sp.get('service_days') || ''
+    const raw = sp?.get('service_days') || ''
     const next = new Set<string>()
     raw.split(',').map((s) => s.trim()).filter(Boolean).forEach((d) => next.add(d))
     setSelected(next)
@@ -41,7 +41,7 @@ export default function ServiceDayFilter() {
   }
 
   const apply = useCallback(() => {
-    const params = new URLSearchParams(sp.toString())
+    const params = new URLSearchParams(sp?.toString() ?? '')
     const csv = Array.from(selected).join(',')
     if (csv) params.set('service_days', csv)
     else params.delete('service_days')
@@ -52,7 +52,7 @@ export default function ServiceDayFilter() {
 
   const clear = () => {
     setSelected(new Set())
-    const params = new URLSearchParams(sp.toString())
+    const params = new URLSearchParams(sp?.toString() ?? '')
     params.delete('service_days')
     const qs = params.toString()
     router.push(qs ? `${pathname}?${qs}` : pathname)

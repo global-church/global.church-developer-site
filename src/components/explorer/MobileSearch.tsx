@@ -32,7 +32,7 @@ export default function MobileSearch({ context = 'home', initialQuery = '' }: Mo
   const sp = useSearchParams()
 
   useEffect(() => {
-    const raw = sp.get('belief') || ''
+    const raw = sp?.get('belief') || ''
     const next = new Set<BeliefValue>()
     const parts = raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
     if (parts.length === 0) {
@@ -58,7 +58,7 @@ export default function MobileSearch({ context = 'home', initialQuery = '' }: Mo
     const selectedValues = Array.from(selectedBeliefs)
     const isAll = selectedValues.length === allValues.length
     if (!isAll && selectedValues.length) params.set('belief', selectedValues.join(','))
-    const language = sp.get('language')
+    const language = sp?.get('language')
     if (language) params.set('language', language)
     router.push(`/explorer${params.toString() ? `?${params.toString()}` : ''}`)
   }
@@ -83,7 +83,7 @@ export default function MobileSearch({ context = 'home', initialQuery = '' }: Mo
     const selectedValues = Array.from(selectedBeliefs)
     const isAll = selectedValues.length === allValues.length
     const csv = selectedValues.join(',')
-    const language = sp.get('language')
+    const language = sp?.get('language')
     const params = new URLSearchParams()
     if (csv && !isAll) params.set('belief', csv)
     if (language) params.set('language', language)
@@ -93,10 +93,10 @@ export default function MobileSearch({ context = 'home', initialQuery = '' }: Mo
 
   function clearFilters() {
     setSelectedBeliefs(new Set())
-    const qParam = (sp.get('q') || searchQuery.trim())
+    const qParam = (sp?.get('q') || searchQuery.trim())
     const params = new URLSearchParams()
     if (qParam) params.set('q', qParam)
-    const language = sp.get('language')
+    const language = sp?.get('language')
     if (language) params.set('language', language)
     router.push(`/explorer${params.toString() ? `?${params.toString()}` : ''}`)
     setFilterOpen(false)

@@ -96,7 +96,7 @@ export default function ResetPasswordPage() {
 
   // Establish session with recovery tokens
   useEffect(() => {
-    if (!tokens || sessionEstablished) return;
+    if (!tokens || sessionEstablished || !supabase) return;
 
     const establishSession = async () => {
       try {
@@ -179,7 +179,7 @@ export default function ResetPasswordPage() {
     async (e: React.FormEvent) => {
       e.preventDefault();
 
-      if (!canSubmit) return;
+      if (!canSubmit || !supabase) return;
 
       setError(null);
       setPending(true);
