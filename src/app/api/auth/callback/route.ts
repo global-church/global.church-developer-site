@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
     const supabase = createSupabaseRouteHandlerClient(request, response);
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
-      console.error('[auth/callback] exchangeCodeForSession error:', error.message);
+      console.error('[auth/callback] exchangeCodeForSession error:', error.message, error);
+      console.error('[auth/callback] request cookies:', request.cookies.getAll().map(c => c.name));
       const errorUrl = request.nextUrl.clone();
       errorUrl.pathname = '/signin';
       errorUrl.searchParams.set('error', 'Unable to complete sign in. Please try again.');
