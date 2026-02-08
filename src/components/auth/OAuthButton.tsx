@@ -30,6 +30,7 @@ export function OAuthButton({ provider }: { provider: OAuthProvider }) {
   const supabase = useSupabaseBrowserClient();
 
   const handleOAuth = async () => {
+    if (!supabase) return;
     await supabase.auth.signInWithOAuth({
       provider,
       options: {

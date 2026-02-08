@@ -38,6 +38,9 @@ export default function Header() {
       setClientRoles([]);
       return;
     }
+    if (!supabase) {
+      return;
+    }
     let cancelled = false;
     (async () => {
       const { data } = await supabase
@@ -86,7 +89,7 @@ export default function Header() {
     setIsMenuOpen(false);
     // Sign out on the browser client first so onAuthStateChange fires immediately
     // and clears the user state, then sign out on the server to clear the cookie
-    await supabase.auth.signOut();
+    await supabase?.auth.signOut();
     await signOut();
     router.push("/");
     router.refresh();

@@ -16,8 +16,8 @@ export function useSession() {
       return;
     }
 
-    // Check if supabase client is a real client (not SSR dummy)
-    if (!supabase.auth?.getUser) {
+    // Skip if supabase is not configured
+    if (!supabase) {
       setLoading(false);
       return;
     }
