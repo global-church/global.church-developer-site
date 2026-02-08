@@ -1,16 +1,16 @@
 'use server';
 
-import { createClient, type AuthApiError, type PostgrestSingleResponse, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type PostgrestSingleResponse, type SupabaseClient } from '@supabase/supabase-js';
 import type { AdminStatus, ChurchPublic } from '@/lib/types';
 import { hydrateChurchList, hydrateChurchPublic } from '@/lib/adminChurchHydration';
 import { createSupabaseServerActionClient, isSupabaseConfigured } from '@/lib/supabaseServerClient';
-import { ensureActiveAdmin } from '@/lib/adminSession';
+import { ensureRole, type UserRole } from '@/lib/session';
 
 export type LoginFormState = {
   success: boolean;
   error?: string | null;
-  mfaTicket?: string | null;
   email?: string | null;
+  message?: string | null;
 };
 
 export type ChurchUpdatePayload = {
@@ -80,7 +80,10 @@ function createSupabaseAdminClient() {
   return { client, table: creds.table };
 }
 
-async function verifyAdminAccess(existingClient?: SupabaseClient): Promise<AdminAuthCheck> {
+async function verifyAdminAccess(
+  existingClient?: SupabaseClient,
+  requiredRoles: UserRole[] = ['admin', 'support', 'editor'],
+): Promise<AdminAuthCheck> {
   if (!isSupabaseConfigured()) {
     return { supabase: existingClient ?? null, error: 'Supabase credentials are not configured.' };
   }
@@ -88,7 +91,7 @@ async function verifyAdminAccess(existingClient?: SupabaseClient): Promise<Admin
   const supabase = existingClient ?? await createSupabaseServerActionClient();
 
   try {
-    await ensureActiveAdmin(supabase);
+    await ensureRole(supabase, ...requiredRoles);
     return { supabase, error: null };
   } catch (error) {
     const message =
@@ -105,95 +108,31 @@ export async function authenticateAdmin(prevState: LoginFormState, formData: For
     };
   }
 
-  const supabase = await createSupabaseServerActionClient();
-  const ticket = formData.get('mfa_ticket');
-
-  if (ticket && typeof ticket === 'string' && ticket.trim().length > 0) {
-    const otp = formData.get('otp');
-    if (!otp || typeof otp !== 'string' || otp.trim().length === 0) {
-      return {
-        success: false,
-        error: 'Enter your 6-digit authentication code.',
-        mfaTicket: ticket,
-        email: prevState.email ?? null,
-      };
-    }
-
-    const { error } = await supabase.auth.mfa.verify({
-      factorId: ticket,
-      challengeId: ticket,
-      code: otp.trim(),
-    });
-
-    if (error) {
-      return {
-        success: false,
-        error: error.message,
-        mfaTicket: ticket,
-        email: prevState.email ?? null,
-      };
-    }
-
-    const { error: membershipError } = await verifyAdminAccess(supabase);
-    if (membershipError) {
-      await supabase.auth.signOut({ scope: 'local' });
-      return {
-        success: false,
-        error: membershipError,
-        email: prevState.email ?? null,
-      };
-    }
-
-    return { success: true, email: prevState.email ?? null };
-  }
-
   const rawEmail = formData.get('email');
-  const rawPassword = formData.get('password');
 
   if (!rawEmail || typeof rawEmail !== 'string') {
     return { success: false, error: 'Email is required.' };
   }
 
-  if (!rawPassword || typeof rawPassword !== 'string') {
-    return { success: false, error: 'Password is required.', email: rawEmail };
-  }
-
   const email = rawEmail.trim().toLowerCase();
-  const password = rawPassword;
 
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const supabase = await createSupabaseServerActionClient();
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/api/auth/callback`,
+    },
+  });
 
   if (error) {
-    const authError = error as AuthApiError;
-    const mfaTicket = (data as { mfa?: { ticket?: string } } | null)?.mfa?.ticket;
-
-    if (authError?.status === 400 && mfaTicket) {
-      return {
-        success: false,
-        error: 'Two-factor authentication required. Enter the code from your authenticator app.',
-        mfaTicket,
-        email,
-      };
-    }
-
-    return {
-      success: false,
-      error: authError?.message ?? 'Unable to sign in with the provided credentials.',
-      email,
-    };
+    return { success: false, error: error.message, email };
   }
 
-  const { error: membershipError } = await verifyAdminAccess(supabase);
-  if (membershipError) {
-    await supabase.auth.signOut({ scope: 'local' });
-    return {
-      success: false,
-      error: membershipError,
-      email,
-    };
-  }
-
-  return { success: true, email };
+  return {
+    success: true,
+    email,
+    message: 'Check your email for a sign-in link.',
+  };
 }
 
 export async function logoutAdmin(): Promise<void> {
@@ -409,4 +348,182 @@ export async function getAdminChurchById(churchId: string): Promise<ChurchPublic
   }
 
   return hydrateChurchPublic(data);
+}
+
+// =============================================================================
+// User Management (admin / support roles)
+// =============================================================================
+
+export type UserListParams = {
+  limit?: number;
+  cursor?: string | null;
+  query?: string;
+};
+
+export type UserListItem = {
+  id: string;
+  email: string;
+  display_name: string | null;
+  roles: string[];
+  api_key_count: number;
+  api_access_approved: boolean;
+  created_at: string;
+};
+
+export type UserListResult = {
+  items: UserListItem[];
+  nextCursor: string | null;
+  previousCursor: string | null;
+  count: number | null;
+};
+
+export async function fetchUsers(params: UserListParams): Promise<UserListResult> {
+  const { error: authError } = await verifyAdminAccess(undefined, ['admin', 'support']);
+  if (authError) {
+    throw new Error(authError);
+  }
+
+  const supabase = await createSupabaseServerActionClient();
+
+  const limit = clampLimit(params.limit);
+  const offset = parseCursorValue(params.cursor);
+
+  let query = supabase
+    .from('profiles')
+    .select('id, email, display_name, api_access_approved, created_at', { count: 'exact' });
+
+  if (params.query) {
+    const search = `%${escapeILikePattern(params.query.trim())}%`;
+    query = query.or(`email.ilike.${search},display_name.ilike.${search}`);
+  }
+
+  const { data: profiles, error, count } = await query
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!profiles || profiles.length === 0) {
+    return { items: [], nextCursor: null, previousCursor: null, count: count ?? 0 };
+  }
+
+  const userIds = profiles.map((p) => p.id);
+
+  const { data: roleRows } = await supabase
+    .from('user_roles')
+    .select('user_id, role')
+    .in('user_id', userIds)
+    .eq('is_active', true);
+
+  const { data: keyCounts } = await supabase
+    .from('api_keys')
+    .select('user_id')
+    .in('user_id', userIds)
+    .eq('is_active', true);
+
+  const roleMap = new Map<string, string[]>();
+  for (const row of roleRows ?? []) {
+    const existing = roleMap.get(row.user_id) ?? [];
+    existing.push(row.role);
+    roleMap.set(row.user_id, existing);
+  }
+
+  const keyCountMap = new Map<string, number>();
+  for (const row of keyCounts ?? []) {
+    keyCountMap.set(row.user_id, (keyCountMap.get(row.user_id) ?? 0) + 1);
+  }
+
+  const items: UserListItem[] = profiles.map((p) => ({
+    id: p.id,
+    email: p.email,
+    display_name: p.display_name,
+    roles: roleMap.get(p.id) ?? [],
+    api_key_count: keyCountMap.get(p.id) ?? 0,
+    api_access_approved: p.api_access_approved ?? false,
+    created_at: p.created_at,
+  }));
+
+  const hasMore = typeof count === 'number' ? offset + limit < count : profiles.length === limit;
+  const nextCursor = hasMore ? String(offset + limit) : null;
+  const previousCursor = offset > 0 ? String(Math.max(0, offset - limit)) : null;
+
+  return { items, nextCursor, previousCursor, count: count ?? null };
+}
+
+export async function assignRole(
+  userId: string,
+  role: UserRole,
+): Promise<{ success: boolean; error?: string }> {
+  const { error: authError } = await verifyAdminAccess(undefined, ['admin']);
+  if (authError) {
+    return { success: false, error: authError };
+  }
+
+  const supabase = await createSupabaseServerActionClient();
+  const session = await ensureRole(supabase, 'admin');
+
+  const { error } = await supabase.from('user_roles').upsert(
+    {
+      user_id: userId,
+      role,
+      is_active: true,
+      assigned_by: session.userId,
+    },
+    { onConflict: 'user_id,role' },
+  );
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
+}
+
+export async function removeRole(
+  userId: string,
+  role: UserRole,
+): Promise<{ success: boolean; error?: string }> {
+  const { error: authError } = await verifyAdminAccess(undefined, ['admin']);
+  if (authError) {
+    return { success: false, error: authError };
+  }
+
+  const supabase = await createSupabaseServerActionClient();
+
+  const { error } = await supabase
+    .from('user_roles')
+    .update({ is_active: false })
+    .eq('user_id', userId)
+    .eq('role', role);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
+}
+
+export async function toggleApiAccess(
+  userId: string,
+  approved: boolean,
+): Promise<{ success: boolean; error?: string }> {
+  const { error: authError } = await verifyAdminAccess(undefined, ['admin', 'support']);
+  if (authError) {
+    return { success: false, error: authError };
+  }
+
+  const supabase = await createSupabaseServerActionClient();
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ api_access_approved: approved })
+    .eq('id', userId);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
 }

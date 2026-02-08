@@ -25,6 +25,8 @@ export function useSupabaseBrowserClient<Database extends DefaultDatabase = Defa
       throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable.');
     }
 
-    return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey);
+    return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: { flowType: 'implicit' },
+    });
   }, []);
 }

@@ -2,17 +2,17 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { createSupabaseServerComponentClient, isSupabaseConfigured } from '@/lib/supabaseServerClient';
-import { getCurrentSession, hasRole } from '@/lib/session';
+import { getCurrentSession } from '@/lib/session';
 import { SessionProvider } from '@/contexts/SessionContext';
-import { AdminSidebar } from '@/components/admin/AdminSidebar';
+import { DashboardShell } from '@/components/dashboard/DashboardShell';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Admin | Global.Church',
+  title: 'Dashboard | Global.Church',
 };
 
-export default async function AdminLayout({ children }: { children: ReactNode }) {
+export default async function DashboardLayout({ children }: { children: ReactNode }) {
   if (!isSupabaseConfigured()) {
     redirect('/signin');
   }
@@ -20,13 +20,13 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const supabase = await createSupabaseServerComponentClient();
   const session = await getCurrentSession(supabase);
 
-  if (!session || !hasRole(session, 'admin', 'support', 'editor')) {
+  if (!session) {
     redirect('/signin');
   }
 
   return (
     <SessionProvider session={session}>
-      <AdminSidebar session={session}>{children}</AdminSidebar>
+      <DashboardShell session={session}>{children}</DashboardShell>
     </SessionProvider>
   );
 }
