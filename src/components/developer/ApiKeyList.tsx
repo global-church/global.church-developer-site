@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { listApiKeys, createApiKey, revokeApiKey, type ApiKeyRecord } from '@/app/dashboard/actions';
+import { listApiKeys, createApiKey, revokeApiKey, type ApiKeyRecord } from '@/app/developer/actions';
 
 export function ApiKeyList() {
   const [keys, setKeys] = useState<ApiKeyRecord[]>([]);

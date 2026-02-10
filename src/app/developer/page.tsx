@@ -29,7 +29,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Link href="/dashboard/keys">
+        <Link href="/developer/keys">
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
             <CardHeader>
               <div className="flex items-center gap-3">
@@ -73,7 +73,7 @@ export default async function DashboardPage() {
           </Card>
         </Link>
 
-        <Link href="/dashboard/settings">
+        <Link href="/developer/settings">
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
             <CardHeader>
               <div className="flex items-center gap-3">

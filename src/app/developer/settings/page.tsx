@@ -1,10 +1,10 @@
 import { redirect } from 'next/navigation';
 import { createSupabaseServerComponentClient } from '@/lib/supabaseServerClient';
 import { getCurrentSession } from '@/lib/session';
-import { ProfileForm } from '@/components/dashboard/ProfileForm';
+import { ProfileForm } from '@/components/developer/ProfileForm';
 
 export const metadata = {
-  title: 'Profile | Global.Church Dashboard',
+  title: 'Profile | Global.Church Developer',
 };
 
 export default async function SettingsPage() {

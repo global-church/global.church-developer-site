@@ -21,7 +21,7 @@ export default async function SignInPage({
     const session = await getCurrentSession(supabase);
 
     if (session) {
-      redirect('/dashboard');
+      redirect('/developer');
     }
   }
 

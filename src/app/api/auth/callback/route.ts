@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
 
   // Determine where to redirect after successful auth
   const redirect = searchParams.get('redirect');
-  const destination = redirect && redirect.startsWith('/') ? redirect : '/dashboard';
+  const destination = redirect && redirect.startsWith('/') ? redirect : '/developer';
 
   const url = request.nextUrl.clone();
   url.pathname = destination;

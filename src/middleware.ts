@@ -27,7 +27,7 @@ export async function middleware(request: NextRequest) {
   // All /api/ routes are intentionally public (e.g. /api/feedback, /api/request-access, /api/ask).
   // If you add a future API route that requires auth, either:
   //   (a) add auth checks inside that route handler directly, or
-  //   (b) use a /api/protected/* prefix and add a guard below similar to /dashboard/*.
+  //   (b) use a /api/protected/* prefix and add a guard below similar to /developer/*.
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/') ||
@@ -53,8 +53,8 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // Protected: /dashboard/*
-  if (pathname.startsWith('/dashboard')) {
+  // Protected: /developer/*
+  if (pathname.startsWith('/developer')) {
     if (!user) {
       const url = request.nextUrl.clone();
       url.pathname = '/signin';

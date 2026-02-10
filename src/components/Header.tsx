@@ -97,7 +97,7 @@ export default function Header() {
 
   const isAuthenticated = !!user;
 
-  // Display name from rich session (dashboard/admin) or basic user
+  // Display name from rich session (developer/admin) or basic user
   const displayName =
     userSession?.displayName ||
     (user?.user_metadata?.full_name as string | undefined) ||
@@ -185,7 +185,7 @@ export default function Header() {
                   </div>
 
                   <Link
-                    href="/dashboard"
+                    href="/developer"
                     onClick={() => setIsUserMenuOpen(false)}
                     className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                   >
@@ -292,7 +292,7 @@ export default function Header() {
                     </div>
 
                     <Link
-                      href="/dashboard"
+                      href="/developer"
                       className="flex items-center gap-3 px-6 py-4 border-b text-gray-800 hover:bg-gray-50"
                       onClick={() => setIsMenuOpen(false)}
                     >

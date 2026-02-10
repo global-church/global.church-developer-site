@@ -1,7 +1,7 @@
 'use client';
 
 import { useUserSession } from '@/contexts/SessionContext';
-import { ApiKeyList } from '@/components/dashboard/ApiKeyList';
+import { ApiKeyList } from '@/components/developer/ApiKeyList';
 import { RequestAccessForm } from '@/components/RequestAccessForm';
 import { Clock } from 'lucide-react';
 

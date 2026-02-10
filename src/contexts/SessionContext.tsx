@@ -19,7 +19,7 @@ export function SessionProvider({
 
 /**
  * Returns the server-fetched UserSession when inside a SessionProvider
- * (dashboard/admin layouts), or null on public pages.
+ * (developer/admin layouts), or null on public pages.
  */
 export function useUserSession(): UserSession | null {
   return useContext(SessionContext);

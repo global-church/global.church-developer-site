@@ -15,7 +15,7 @@ export default async function SignUpPage() {
     const session = await getCurrentSession(supabase);
 
     if (session) {
-      redirect('/dashboard');
+      redirect('/developer');
     }
   }
 

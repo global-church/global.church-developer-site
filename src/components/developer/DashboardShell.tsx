@@ -10,9 +10,9 @@ import Footer from '@/components/Footer';
 import type { UserSession } from '@/lib/session';
 
 const navItems = [
-  { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
-  { href: '/dashboard/keys', label: 'API Keys', icon: Key },
-  { href: '/dashboard/settings', label: 'Profile', icon: Settings },
+  { href: '/developer', label: 'Overview', icon: LayoutDashboard },
+  { href: '/developer/keys', label: 'API Keys', icon: Key },
+  { href: '/developer/settings', label: 'Profile', icon: Settings },
 ];
 
 export function DashboardShell({
@@ -109,7 +109,7 @@ export function DashboardShell({
         >
           {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </Button>
-        <span className="ml-3 text-sm font-semibold text-gray-900">Dashboard</span>
+        <span className="ml-3 text-sm font-semibold text-gray-900">Developer</span>
       </div>
 
       {/* Mobile sidebar overlay */}

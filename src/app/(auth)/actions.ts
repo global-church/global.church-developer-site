@@ -100,5 +100,5 @@ export async function getRedirectForUser(): Promise<string> {
   const session = await getCurrentSession(supabase);
   if (!session) return '/';
   if (session.roles.length > 0) return '/admin';
-  return '/dashboard';
+  return '/developer';
 }

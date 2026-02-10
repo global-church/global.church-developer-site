@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
-const SIDEBAR_PREFIXES = ['/dashboard', '/admin'];
+const SIDEBAR_PREFIXES = ['/developer', '/admin'];
 
 export function ConditionalLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? '/';

@@ -4,12 +4,12 @@ import { redirect } from 'next/navigation';
 import { createSupabaseServerComponentClient, isSupabaseConfigured } from '@/lib/supabaseServerClient';
 import { getCurrentSession } from '@/lib/session';
 import { SessionProvider } from '@/contexts/SessionContext';
-import { DashboardShell } from '@/components/dashboard/DashboardShell';
+import { DashboardShell } from '@/components/developer/DashboardShell';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Dashboard | Global.Church',
+  title: 'Developer | Global.Church',
 };
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {

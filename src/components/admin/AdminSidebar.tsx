@@ -67,7 +67,7 @@ export function AdminSidebar({
                 Switch to
               </div>
               <Link
-                href="/dashboard"
+                href="/developer"
                 onClick={() => { setSwitcherOpen(false); setSidebarOpen(false); }}
                 className="flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-slate-100"
               >
