@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Copy, Check, Trash2, Plus, Key } from 'lucide-react';
+import { Copy, Check, Trash2, Plus, Key, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,7 @@ export function ApiKeyList() {
 
   // Revoke state
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [showRevoked, setShowRevoked] = useState(false);
 
   const loadKeys = async () => {
     setLoading(true);
@@ -193,27 +194,33 @@ export function ApiKeyList() {
       {/* Revoked keys */}
       {revokedKeys.length > 0 && (
         <div>
-          <h2 className="text-sm font-medium text-gray-500 mb-3">
+          <button
+            onClick={() => setShowRevoked(!showRevoked)}
+            className="flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-700 mb-3"
+          >
+            <ChevronRight className={`h-4 w-4 transition-transform ${showRevoked ? 'rotate-90' : ''}`} />
             Revoked Keys ({revokedKeys.length})
-          </h2>
-          <div className="space-y-2 opacity-60">
-            {revokedKeys.map((k) => (
-              <Card key={k.id}>
-                <CardContent className="py-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm line-through">{k.label}</span>
-                      <Badge variant="outline" className="text-xs">Revoked</Badge>
+          </button>
+          {showRevoked && (
+            <div className="space-y-2 opacity-60">
+              {revokedKeys.map((k) => (
+                <Card key={k.id}>
+                  <CardContent className="py-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm line-through">{k.label}</span>
+                        <Badge variant="outline" className="text-xs">Revoked</Badge>
+                      </div>
+                      <code className="text-xs text-gray-400 font-mono">{k.key_hint}</code>
+                      <p className="text-xs text-gray-400">
+                        Revoked {k.revoked_at ? new Date(k.revoked_at).toLocaleDateString() : ''}
+                      </p>
                     </div>
-                    <code className="text-xs text-gray-400 font-mono">{k.key_hint}</code>
-                    <p className="text-xs text-gray-400">
-                      Revoked {k.revoked_at ? new Date(k.revoked_at).toLocaleDateString() : ''}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
