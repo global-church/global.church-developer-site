@@ -383,12 +383,16 @@ export async function fetchUsers(params: UserListParams): Promise<UserListResult
     throw new Error(authError);
   }
 
-  const supabase = await createSupabaseServerActionClient();
+  // Use service-role client so admins can read all profiles/roles/keys
+  const { client: adminClient, error: clientError } = createSupabaseAdminClient();
+  if (!adminClient || clientError) {
+    throw new Error(clientError ?? 'Failed to initialise admin client.');
+  }
 
   const limit = clampLimit(params.limit);
   const offset = parseCursorValue(params.cursor);
 
-  let query = supabase
+  let query = adminClient
     .from('profiles')
     .select('id, email, display_name, api_access_approved, created_at', { count: 'exact' });
 
@@ -411,13 +415,13 @@ export async function fetchUsers(params: UserListParams): Promise<UserListResult
 
   const userIds = profiles.map((p) => p.id);
 
-  const { data: roleRows } = await supabase
+  const { data: roleRows } = await adminClient
     .from('user_roles')
     .select('user_id, role')
     .in('user_id', userIds)
     .eq('is_active', true);
 
-  const { data: keyCounts } = await supabase
+  const { data: keyCounts } = await adminClient
     .from('api_keys')
     .select('user_id')
     .in('user_id', userIds)
@@ -456,15 +460,20 @@ export async function assignRole(
   userId: string,
   role: UserRole,
 ): Promise<{ success: boolean; error?: string }> {
-  const { error: authError } = await verifyAdminAccess(undefined, ['admin']);
-  if (authError) {
-    return { success: false, error: authError };
+  const { error: authError, supabase } = await verifyAdminAccess(undefined, ['admin']);
+  if (authError || !supabase) {
+    return { success: false, error: authError ?? 'Authentication failed.' };
   }
 
-  const supabase = await createSupabaseServerActionClient();
   const session = await ensureRole(supabase, 'admin');
 
-  const { error } = await supabase.from('user_roles').upsert(
+  // Use service-role client — user_roles is locked down by RLS
+  const { client: adminClient, error: clientError } = createSupabaseAdminClient();
+  if (!adminClient || clientError) {
+    return { success: false, error: clientError ?? 'Failed to initialise admin client.' };
+  }
+
+  const { error } = await adminClient.from('user_roles').upsert(
     {
       user_id: userId,
       role,
@@ -490,9 +499,13 @@ export async function removeRole(
     return { success: false, error: authError };
   }
 
-  const supabase = await createSupabaseServerActionClient();
+  // Use service-role client — user_roles is locked down by RLS
+  const { client: adminClient, error: clientError } = createSupabaseAdminClient();
+  if (!adminClient || clientError) {
+    return { success: false, error: clientError ?? 'Failed to initialise admin client.' };
+  }
 
-  const { error } = await supabase
+  const { error } = await adminClient
     .from('user_roles')
     .update({ is_active: false })
     .eq('user_id', userId)
@@ -514,9 +527,13 @@ export async function toggleApiAccess(
     return { success: false, error: authError };
   }
 
-  const supabase = await createSupabaseServerActionClient();
+  // Use service-role client — profiles.api_access_approved is protected by trigger/RLS
+  const { client: adminClient, error: clientError } = createSupabaseAdminClient();
+  if (!adminClient || clientError) {
+    return { success: false, error: clientError ?? 'Failed to initialise admin client.' };
+  }
 
-  const { error } = await supabase
+  const { error } = await adminClient
     .from('profiles')
     .update({ api_access_approved: approved })
     .eq('id', userId);
