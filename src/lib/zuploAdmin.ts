@@ -33,6 +33,8 @@ export type CreateKeyResult = {
 };
 
 const ZUPLO_API_BASE = 'https://dev.zuplo.com';
+const DEFAULT_CONSUMER_PLAN = process.env.ZUPLO_DEFAULT_PLAN ?? 'standard';
+const DEFAULT_CONSUMER_RATE_LIMIT = Number(process.env.ZUPLO_DEFAULT_RATE_LIMIT ?? 100);
 
 function getConfig(): ZuploConfig {
   const apiKey = process.env.ZUPLO_DEV_API_KEY;
@@ -95,7 +97,7 @@ export async function getZuploConsumer(
 export async function createZuploConsumerWithKey(
   consumerName: string,
   description: string,
-  metadata: Record<string, string> = {},
+  metadata: Record<string, string | number> = {},
 ): Promise<CreateKeyResult> {
   const config = getConfig();
   const url = buildUrl(config, `/consumers?with-api-key=true`);
@@ -105,7 +107,7 @@ export async function createZuploConsumerWithKey(
     body: JSON.stringify({
       name: consumerName,
       description,
-      metadata,
+      metadata: { plan: DEFAULT_CONSUMER_PLAN, rateLimit: DEFAULT_CONSUMER_RATE_LIMIT, ...metadata },
     }),
   });
 
