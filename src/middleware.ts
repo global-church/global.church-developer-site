@@ -23,7 +23,11 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const response = NextResponse.next({ request });
 
-  // Skip static files and API routes (except auth callback)
+  // Skip static files and API routes.
+  // All /api/ routes are intentionally public (e.g. /api/feedback, /api/request-access, /api/ask).
+  // If you add a future API route that requires auth, either:
+  //   (a) add auth checks inside that route handler directly, or
+  //   (b) use a /api/protected/* prefix and add a guard below similar to /dashboard/*.
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/') ||

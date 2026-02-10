@@ -102,6 +102,13 @@ export async function createApiKey(label: string): Promise<CreateKeyResult> {
 
     if (insertError) {
       console.error('[createApiKey] Supabase insert error:', insertError.message);
+      // Clean up the orphaned Zuplo key so it doesn't stay active without a local record
+      try {
+        const cleanupName = consumerName(session.userId);
+        await deleteZuploApiKey(cleanupName, keyId);
+      } catch (cleanupErr) {
+        console.error('[createApiKey] Failed to clean up orphaned Zuplo key:', cleanupErr);
+      }
       return { success: false, error: insertError.message };
     }
 
@@ -167,12 +174,10 @@ export async function revokeApiKey(keyId: string): Promise<{
       return { success: false, error: 'API key not found.' };
     }
 
-    try {
-      const name = consumerName(session.userId);
-      await deleteZuploApiKey(name, keyRecord.zuplo_key_id);
-    } catch {
-      // If Zuplo deletion fails, still mark as revoked locally
-    }
+    // Delete from Zuplo first — if this fails, do NOT mark as revoked locally
+    // so the user can retry. Otherwise the key stays active in Zuplo's gateway.
+    const name = consumerName(session.userId);
+    await deleteZuploApiKey(name, keyRecord.zuplo_key_id);
 
     const { error: updateError } = await supabase
       .from('api_keys')

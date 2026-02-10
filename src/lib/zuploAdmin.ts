@@ -55,13 +55,17 @@ async function zuploFetch(
   apiKey: string,
   options: RequestInit = {},
 ): Promise<Response> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${apiKey}`,
+    ...((options.headers as Record<string, string>) ?? {}),
+  };
+  // Only set Content-Type for requests that carry a body
+  if (options.body) {
+    headers['Content-Type'] = 'application/json';
+  }
   const res = await fetch(url, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-      ...((options.headers as Record<string, string>) ?? {}),
-    },
+    headers,
   });
   return res;
 }
