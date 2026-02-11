@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { searchChurches, getChurchById } from '@/lib/zuplo';
+import { searchChurches, getChurchById } from '@/lib/zuploClient';
 import type { ChurchPublic } from '@/lib/types';
 import { fetchAdminChurchesByStatus, getAdminChurchById } from '@/app/admin/actions';
 import { ChurchEditor } from './ChurchEditor';

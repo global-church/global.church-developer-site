@@ -1,7 +1,6 @@
 // src/lib/nearMe.ts
-import { searchChurchesByRadius } from "@/lib/zuplo";
-import type { ChurchWithinRadiusRow } from "@/lib/types";
-import type { ZuploListResponse } from "@/lib/zuplo";
+import { searchChurchesByRadius } from "@/lib/zuploClient";
+import type { ChurchWithinRadiusRow, ZuploListResponse } from "@/lib/types";
 
 export type NearbyChurch = {
   church_id: string;

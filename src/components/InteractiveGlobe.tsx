@@ -8,7 +8,7 @@ import { Plus, Minus } from 'lucide-react';
 import Globe, { type GlobeMethods } from 'react-globe.gl';
 import * as THREE from 'three';
 import { Feature } from 'geojson';
-import { searchChurchesGeoJSON } from '@/lib/zuplo';
+import { searchChurchesGeoJSON } from '@/lib/zuploClient';
 
 // Globe zoom limits (altitude). Tweak these to adjust min/max zoom.
 const MIN_GLOBE_ALTITUDE = 1.7; // closer (zoomed in)

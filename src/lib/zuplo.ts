@@ -1,23 +1,19 @@
-// src/lib/zuplo.ts
-import type { ChurchPublic, ChurchWithinRadiusRow } from './types';
+// src/lib/zuplo.ts — SERVER-ONLY. Client components must use zuploClient.ts instead.
+import 'server-only';
+import type { ChurchPublic, ChurchWithinRadiusRow, ZuploListResponse } from './types';
 import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
-const ZUPLO_API_URL = process.env.NEXT_PUBLIC_ZUPLO_API_URL;
-const ZUPLO_API_KEY = process.env.NEXT_PUBLIC_ZUPLO_API_KEY;
+export type { ZuploListResponse };
 
-export type ZuploListResponse<T> = {
-  items: T[];
-  limit: number;
-  hasMore: boolean;
-  nextCursor: string | null;
-};
+const ZUPLO_API_URL = process.env.ZUPLO_API_URL;
+const ZUPLO_API_KEY = process.env.ZUPLO_API_KEY;
 
 function getZuploConfig(): { baseUrl: string; apiKey: string } {
   if (!ZUPLO_API_URL || !ZUPLO_API_KEY) {
     const urlStatus = ZUPLO_API_URL ? 'set' : 'unset';
     const keyStatus = ZUPLO_API_KEY ? 'set' : 'unset';
     throw new Error(
-      `Zuplo API URL or Key is not defined. Set NEXT_PUBLIC_ZUPLO_API_URL and NEXT_PUBLIC_ZUPLO_API_KEY in .env.local (see .env.example). ` +
+      `Zuplo API URL or Key is not defined. Set ZUPLO_API_URL and ZUPLO_API_KEY in .env.local (see .env.example). ` +
       `(url: ${urlStatus}, key: ${keyStatus})`
     );
   }

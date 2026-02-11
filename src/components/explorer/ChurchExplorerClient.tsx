@@ -15,7 +15,7 @@ import ServiceDayFilter from "@/components/explorer/filters/ServiceDayFilter";
 import ServiceTimeFilter from "./filters/ServiceTimeFilter";
 import DenominationFilter from "./filters/DenominationFilter";
 import ProgramsFilter from "./filters/ProgramsFilter";
-import { searchChurches } from "@/lib/zuplo";
+import { searchChurches } from "@/lib/zuploClient";
 import { formatLanguages, normalizeLanguagesToCodes } from "@/lib/languages";
 
 // Client-side parsing/filtering removed in favor of backend filtering

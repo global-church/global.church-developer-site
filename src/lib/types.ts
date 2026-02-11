@@ -133,3 +133,11 @@ export type ChurchPublic = {
 export type ChurchWithinRadiusRow = ChurchPublic & {
   distance_m: number;
 };
+
+/** Paginated list response from Zuplo API */
+export type ZuploListResponse<T> = {
+  items: T[];
+  limit: number;
+  hasMore: boolean;
+  nextCursor: string | null;
+};

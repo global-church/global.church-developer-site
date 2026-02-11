@@ -52,17 +52,17 @@ export async function POST(req: NextRequest) {
     }
 
     const start = Date.now();
-    const mcpUrl = process.env.NEXT_PUBLIC_MCP_URL;
-    const mcpApiKey = process.env.GLOBAL_CHURCH_API_KEY || process.env.NEXT_PUBLIC_ZUPLO_API_KEY;
+    const mcpUrl = process.env.MCP_URL;
+    const mcpApiKey = process.env.GLOBAL_CHURCH_API_KEY || process.env.ZUPLO_API_KEY;
     if (!mcpUrl) {
-      console.error('MCP URL not configured. Set NEXT_PUBLIC_MCP_URL');
+      console.error('MCP URL not configured. Set MCP_URL');
       return NextResponse.json(
-        { error: 'Server misconfiguration.', detail: 'NEXT_PUBLIC_MCP_URL is not set.' },
+        { error: 'Server misconfiguration.', detail: 'MCP_URL is not set.' },
         { status: 500 },
       );
     }
     if (!mcpApiKey) {
-      console.error('MCP API key not configured. Set GLOBAL_CHURCH_API_KEY');
+      console.error('MCP API key not configured. Set GLOBAL_CHURCH_API_KEY or ZUPLO_API_KEY');
       return NextResponse.json(
         { error: 'Server misconfiguration.', detail: 'GLOBAL_CHURCH_API_KEY is not set.' },
         { status: 500 },

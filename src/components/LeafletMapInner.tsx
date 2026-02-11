@@ -8,7 +8,7 @@ import type { DivIcon, LatLngBoundsExpression } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import Link from 'next/link'
 import * as GeoJSON from 'geojson'
-import { searchChurchesByBbox } from '@/lib/zuplo'
+import { searchChurchesByBbox } from '@/lib/zuploClient'
 import { formatLanguages } from '@/lib/languages'
 
 // ChurchPin type is now defined in ChurchMap.tsx
