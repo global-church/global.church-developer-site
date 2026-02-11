@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
+import { emailLimiter, getClientIp } from '@/lib/rateLimit'
 
 export const runtime = 'nodejs'
 
@@ -45,6 +46,12 @@ function asText(obj: Record<string, string | undefined>): string {
 }
 
 export async function POST(req: NextRequest) {
+  const ip = getClientIp(req)
+  const { limited } = emailLimiter.check(ip)
+  if (limited) {
+    return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 })
+  }
+
   try {
     const body = (await req.json()) as RequestBody
     const fullName = isNonEmptyString(body.fullName) ? body.fullName.trim() : ''
@@ -154,26 +161,13 @@ export async function POST(req: NextRequest) {
 
     if (!res.ok) {
       const raw = await res.text()
-      let detail: unknown = raw
-      try {
-        const parsed = JSON.parse(raw)
-        detail = parsed
-      } catch {
-        // keep raw text
-      }
-      console.error('Resend error', {
+      console.error('Resend error (request-access)', {
         status: res.status,
         statusText: res.statusText,
         body: raw?.slice(0, 2000),
       })
       return NextResponse.json(
-        {
-          error: 'Failed to send email.',
-          status: res.status,
-          detail,
-          hint:
-            'Verify EMAIL_FROM is a verified sender/domain and your RESEND_API_KEY has sending permissions.',
-        },
+        { error: 'Failed to submit request.' },
         { status: 502 },
       )
     }
@@ -182,10 +176,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('request-access error', err)
     return NextResponse.json(
-      {
-        error: 'Unexpected error.',
-        detail: err instanceof Error ? err.message : String(err),
-      },
+      { error: 'Unexpected error.' },
       { status: 500 },
     )
   }

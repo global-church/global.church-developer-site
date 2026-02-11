@@ -9,9 +9,11 @@ export async function GET(request: NextRequest) {
   const tokenHash = searchParams.get('token_hash');
   const type = searchParams.get('type');
 
-  // Determine where to redirect after successful auth
+  // Determine where to redirect after successful auth.
+  // Only allow relative paths (starts with "/" but NOT "//") to prevent open redirects.
   const redirect = searchParams.get('redirect');
-  const destination = redirect && redirect.startsWith('/') ? redirect : '/developer';
+  const isSafeRedirect = redirect && redirect.startsWith('/') && !redirect.startsWith('//');
+  const destination = isSafeRedirect ? redirect : '/developer';
 
   const url = request.nextUrl.clone();
   url.pathname = destination;
@@ -36,7 +38,7 @@ export async function GET(request: NextRequest) {
     const supabase = createSupabaseRouteHandlerClient(request, response);
     const { error } = await supabase.auth.verifyOtp({
       token_hash: tokenHash,
-      type: type as 'magiclink' | 'email',
+      type: (type === 'magiclink' || type === 'email') ? type : 'magiclink',
     });
     if (error) {
       console.error('[auth/callback] verifyOtp error:', error.message, { type, tokenHash: tokenHash.slice(0, 8) + '...' });

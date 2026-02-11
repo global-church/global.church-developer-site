@@ -22,7 +22,7 @@ export function useSupabaseBrowserClient<Database extends DefaultDatabase = Defa
     }
 
     return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
-      auth: { flowType: 'implicit' },
+      auth: { flowType: 'pkce' },
     });
   }, []);
 }

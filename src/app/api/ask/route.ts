@@ -1,14 +1,9 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { askLimiter, getClientIp } from '@/lib/rateLimit';
 
-interface RateLimitEntry {
-  count: number;
-  timestamp: number;
-}
-
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = 5;
-const rateLimitMap = new Map<string, RateLimitEntry>();
+const MAX_QUESTION_LENGTH = 2_000;
+const MAX_HISTORY_ENTRY_LENGTH = 4_000;
 
 type ChatTurn = { role: 'user' | 'assistant'; content: string };
 
@@ -28,26 +23,19 @@ export async function POST(req: NextRequest) {
             const content = obj.content;
             if (role !== 'user' && role !== 'assistant') return null;
             if (typeof content !== 'string' || !content.trim()) return null;
-            return { role, content } as ChatTurn;
+            return { role, content: content.slice(0, MAX_HISTORY_ENTRY_LENGTH) } as ChatTurn;
           })
           .filter((x): x is ChatTurn => !!x)
       : [];
     const safeHistory = parsedHistory.slice(-12); // cap context
-    const q = typeof question === 'string' ? question : '';
+    const q = typeof question === 'string' ? question.slice(0, MAX_QUESTION_LENGTH) : '';
     if (!q.trim()) {
       return NextResponse.json({ error: 'Question required.' }, { status: 400 });
     }
 
-    const ip = req.headers.get('x-forwarded-for') ?? 'unknown';
-    const now = Date.now();
-    const entry = rateLimitMap.get(ip) ?? { count: 0, timestamp: now };
-    if (now - entry.timestamp > RATE_LIMIT_WINDOW_MS) {
-      entry.count = 0;
-      entry.timestamp = now;
-    }
-    entry.count += 1;
-    rateLimitMap.set(ip, entry);
-    if (entry.count > RATE_LIMIT_MAX) {
+    const ip = getClientIp(req);
+    const { limited } = askLimiter.check(ip);
+    if (limited) {
       return NextResponse.json({ error: 'Too many requests. Please slow down.' }, { status: 429 });
     }
 
@@ -57,14 +45,14 @@ export async function POST(req: NextRequest) {
     if (!mcpUrl) {
       console.error('MCP URL not configured. Set MCP_URL');
       return NextResponse.json(
-        { error: 'Server misconfiguration.', detail: 'MCP_URL is not set.' },
+        { error: 'Server misconfiguration.' },
         { status: 500 },
       );
     }
     if (!mcpApiKey) {
       console.error('MCP API key not configured. Set GLOBAL_CHURCH_API_KEY or ZUPLO_API_KEY');
       return NextResponse.json(
-        { error: 'Server misconfiguration.', detail: 'GLOBAL_CHURCH_API_KEY is not set.' },
+        { error: 'Server misconfiguration.' },
         { status: 500 },
       );
     }
@@ -122,24 +110,12 @@ export async function POST(req: NextRequest) {
         statusText: openaiRes.statusText,
         body: errText,
       });
-      let detail: string | undefined;
-      try {
-        const parsed = JSON.parse(errText);
-        detail = parsed.error?.message ?? errText;
-      } catch {
-        detail = errText;
-      }
       return NextResponse.json(
-        {
-          error: 'OpenAI request failed.',
-          status: openaiRes.status,
-          detail,
-        },
+        { error: 'Search service temporarily unavailable.' },
         { status: 500 },
       );
     }
     const data = await openaiRes.json();
-    console.dir(data, { depth: 4 });
     interface OutputItem {
       type: string;
       // legacy tool result shape
@@ -245,10 +221,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('ask route error', err);
     return NextResponse.json(
-      {
-        error: 'Unexpected error.',
-        detail: err instanceof Error ? err.message : String(err),
-      },
+      { error: 'Unexpected error.' },
       { status: 500 },
     );
   }

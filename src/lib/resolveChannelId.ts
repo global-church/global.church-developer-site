@@ -191,6 +191,9 @@ async function resolveViaOEmbed(originalUrl: string): Promise<string | null> {
 export async function getChannelIdFromAnyYouTubeUrl(youtubeUrl: string): Promise<string | null> {
   const { kind, idOrPath } = classifyYouTubeUrl(youtubeUrl);
 
+  // Reject non-YouTube URLs to prevent SSRF
+  if (kind === 'unknown') return null;
+
   // Direct channel id
   if (kind === 'channel') return idOrPath;
 

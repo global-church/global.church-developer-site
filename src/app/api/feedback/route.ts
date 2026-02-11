@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
+import { emailLimiter, getClientIp } from '@/lib/rateLimit'
 
 export const runtime = 'nodejs'
 
@@ -43,6 +44,12 @@ function asTextAll(obj: Record<string, string | undefined>): string {
 }
 
 export async function POST(req: NextRequest) {
+  const ip = getClientIp(req)
+  const { limited } = emailLimiter.check(ip)
+  if (limited) {
+    return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 })
+  }
+
   try {
     const body = (await req.json()) as RequestBody
     const fullName = isNonEmptyString(body.fullName) ? body.fullName.trim() : ''
@@ -152,56 +159,28 @@ export async function POST(req: NextRequest) {
 
     if (!res.ok) {
       const raw = await res.text()
-      let detail: unknown = raw
-      try { detail = JSON.parse(raw) } catch {}
       console.error('Resend error (feedback)', {
         status: res.status,
         statusText: res.statusText,
         body: raw?.slice(0, 2000),
       })
       return NextResponse.json(
-        {
-          error: 'Failed to send email.',
-          status: res.status,
-          detail,
-          hint:
-            'Verify EMAIL_FROM is verified and RESEND_API_KEY has sending permissions.',
-        },
+        { error: 'Failed to send feedback.' },
         { status: 502 },
       )
     }
 
     return NextResponse.json({ ok: true })
   } catch (err) {
-    const debugId = (globalThis.crypto && 'randomUUID' in globalThis.crypto)
-      ? (globalThis.crypto as Crypto).randomUUID()
-      : `dbg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
-
-    const diagnostics = {
-      hasResendApiKey: Boolean(process.env.RESEND_API_KEY),
-      hasEmailFrom: Boolean(process.env.EMAIL_FROM),
-      region: process.env.VERCEL_REGION ?? null,
-      runtime: process.version,
-    }
-
     console.error('feedback route error', {
-      debugId,
       error:
         err instanceof Error
           ? { name: err.name, message: err.message, stack: err.stack }
           : { message: String(err) },
-      diagnostics,
     })
 
     return NextResponse.json(
-      {
-        error: 'Unexpected error.',
-        detail: err instanceof Error ? err.message : String(err),
-        debugId,
-        diagnostics,
-        hint:
-          'The server failed to send via Resend (e.g., network or provider issue). Check Vercel logs using the debugId and verify EMAIL_FROM verification and RESEND_API_KEY permissions.',
-      },
+      { error: 'Unexpected error.' },
       { status: 500 },
     )
   }

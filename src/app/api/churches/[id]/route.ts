@@ -16,7 +16,7 @@ export async function GET(
   } catch (err) {
     console.error('churches/[id] proxy error', err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Internal error' },
+      { error: 'Failed to fetch church.' },
       { status: 500 },
     );
   }

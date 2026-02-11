@@ -92,14 +92,14 @@ async function fetchFromZuploAPI<T>(params: Record<string, unknown>): Promise<Zu
     response = await fetch(requestUrl, { headers });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`Network error fetching ${requestUrl}: ${msg}`);
+    console.error(`Network error fetching ${requestUrl}: ${msg}`);
+    throw new Error('Upstream API is unreachable.');
   }
 
   if (!response.ok) {
     const errorBody = await response.text();
-    console.error(`API Error (${response.status}): ${errorBody}`);
-    const snippet = errorBody.slice(0, 500);
-    throw new Error(`HTTP ${response.status} from ${requestUrl}: ${snippet}`);
+    console.error(`API Error (${response.status}) from ${requestUrl}: ${errorBody}`);
+    throw new Error(`Upstream API returned ${response.status}.`);
   }
 
   const data = await response.json();
@@ -158,7 +158,8 @@ export async function getChurchById(id: string): Promise<ChurchPublic | null> {
   const res = await fetch(url.toString(), { headers });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`HTTP ${res.status} from ${url.toString()}: ${body.slice(0, 500)}`);
+    console.error(`API Error (${res.status}) from ${url.toString()}: ${body}`);
+    throw new Error(`Upstream API returned ${res.status}.`);
   }
   const payload = await res.json();
 

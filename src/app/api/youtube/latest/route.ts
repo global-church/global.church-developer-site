@@ -58,7 +58,7 @@ export async function GET(req: Request) {
     resp.headers.set('Cache-Control', 's-maxage=300, stale-while-revalidate=300');
     return resp;
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error('youtube/latest error', e);
+    return NextResponse.json({ error: 'Failed to fetch YouTube data.' }, { status: 500 });
   }
 }

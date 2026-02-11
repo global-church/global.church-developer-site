@@ -153,8 +153,15 @@ export async function createZuploApiKey(
   };
 }
 
+const DELETE_MAX_RETRIES = 3;
+const DELETE_INITIAL_BACKOFF_MS = 500;
+
 /**
  * Delete (revoke) an API key.
+ *
+ * Retries up to 3 times with exponential backoff (500ms → 1s → 2s) to handle
+ * transient Zuplo outages. Without retry, a single network hiccup leaves the
+ * key active at the gateway while the caller may give up.
  */
 export async function deleteZuploApiKey(
   consumerName: string,
@@ -166,10 +173,44 @@ export async function deleteZuploApiKey(
     `/consumers/${encodeURIComponent(consumerName)}/keys/${encodeURIComponent(keyId)}`,
   );
 
-  const res = await zuploFetch(url, config.apiKey, { method: 'DELETE' });
+  let lastError: Error | null = null;
 
-  if (!res.ok && res.status !== 404) {
-    const body = await res.text();
-    throw new Error(`Zuplo API error (delete key): ${res.status} ${body}`);
+  for (let attempt = 0; attempt < DELETE_MAX_RETRIES; attempt++) {
+    try {
+      const res = await zuploFetch(url, config.apiKey, { method: 'DELETE' });
+
+      // 2xx or 404 (already deleted) are both success
+      if (res.ok || res.status === 404) return;
+
+      // 4xx (except 404) are not retryable — the request itself is wrong
+      if (res.status >= 400 && res.status < 500) {
+        const body = await res.text();
+        throw new Error(`Zuplo API error (delete key): ${res.status} ${body}`);
+      }
+
+      // 5xx — retryable server error
+      const body = await res.text();
+      lastError = new Error(`Zuplo API error (delete key): ${res.status} ${body}`);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      // Non-retryable client errors are re-thrown from the 4xx branch above
+      // and will have already exited the function. Network errors and 5xx
+      // errors fall through to the backoff below.
+    }
+
+    if (attempt < DELETE_MAX_RETRIES - 1) {
+      const backoff = DELETE_INITIAL_BACKOFF_MS * 2 ** attempt;
+      console.warn(
+        `[deleteZuploApiKey] Attempt ${attempt + 1}/${DELETE_MAX_RETRIES} failed, retrying in ${backoff}ms`,
+        { consumerName, keyId, error: lastError?.message },
+      );
+      await new Promise((resolve) => setTimeout(resolve, backoff));
+    }
   }
+
+  console.error(
+    `[deleteZuploApiKey] All ${DELETE_MAX_RETRIES} attempts failed`,
+    { consumerName, keyId, error: lastError?.message },
+  );
+  throw lastError ?? new Error('Failed to delete Zuplo API key after retries.');
 }

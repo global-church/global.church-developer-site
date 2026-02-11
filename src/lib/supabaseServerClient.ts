@@ -58,7 +58,7 @@ export async function createSupabaseServerComponentClient<Database extends Defau
   const cookieStore = await cookies();
   return createServerClient<Database>(url, key, {
     cookies: buildCookieAdapter(cookieStore, false),
-    auth: { flowType: 'implicit' },
+    auth: { flowType: 'pkce' },
   });
 }
 
@@ -67,7 +67,7 @@ export async function createSupabaseServerActionClient<Database extends DefaultD
   const cookieStore = await cookies();
   return createServerClient<Database>(url, key, {
     cookies: buildCookieAdapter(cookieStore, true),
-    auth: { flowType: 'implicit' },
+    auth: { flowType: 'pkce' },
   });
 }
 
@@ -85,7 +85,7 @@ export function createSupabaseRouteHandlerClient<Database extends DefaultDatabas
         });
       },
     },
-    auth: { flowType: 'implicit' },
+    auth: { flowType: 'pkce' },
   });
 }
 
@@ -103,7 +103,7 @@ export function createSupabaseMiddlewareClient<Database extends DefaultDatabase 
         });
       },
     },
-    auth: { flowType: 'implicit' },
+    auth: { flowType: 'pkce' },
   });
 }
 
