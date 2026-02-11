@@ -21,18 +21,22 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, reason: 'fb_url required' }, { status: 400 });
   }
 
+  // Validate URL is a Facebook domain to prevent SSRF attacks
+  let target: string;
   try {
+    const url = new URL(fbUrl);
+    const host = url.hostname.replace(/^www\./, '').toLowerCase();
+    if (host !== 'facebook.com' && host !== 'm.facebook.com' && host !== 'fb.com') {
+      return NextResponse.json({ ok: false, reason: 'invalid_domain' }, { status: 400 });
+    }
     // Prefer m.facebook.com for simpler HTML that is less likely to be blocked
-    let target = fbUrl;
-    try {
-      const url = new URL(fbUrl);
-      const host = url.hostname.replace(/^www\./, '');
-      if (host === 'facebook.com' || host === 'm.facebook.com' || host === 'fb.com') {
-        url.hostname = 'm.facebook.com';
-        target = url.toString();
-      }
-    } catch {}
+    url.hostname = 'm.facebook.com';
+    target = url.toString();
+  } catch {
+    return NextResponse.json({ ok: false, reason: 'invalid_url' }, { status: 400 });
+  }
 
+  try {
     const res = await fetch(target, { headers: HEADERS, redirect: 'follow' as const, cache: 'no-store' });
     // Hard 404/410/403 etc.
     if (!res.ok) {
