@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Copy, Check, Trash2, Plus, Key, ChevronRight } from 'lucide-react';
+import { Copy, Check, Trash2, Plus, Key, ChevronRight, Pencil, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { listApiKeys, createApiKey, revokeApiKey, type ApiKeyRecord } from '@/app/developer/actions';
+import { listApiKeys, createApiKey, revokeApiKey, updateApiKeyLabel, type ApiKeyRecord } from '@/app/developer/actions';
 
 export function ApiKeyList() {
   const [keys, setKeys] = useState<ApiKeyRecord[]>([]);
@@ -23,6 +23,11 @@ export function ApiKeyList() {
   // Revoke state
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [showRevoked, setShowRevoked] = useState(false);
+
+  // Rename state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const loadKeys = async () => {
     setLoading(true);
@@ -73,6 +78,32 @@ export function ApiKeyList() {
   const dismissNewKey = () => {
     setNewKey(null);
     setShowCreate(false);
+  };
+
+  const startEditing = (key: ApiKeyRecord) => {
+    setEditingId(key.id);
+    setEditLabel(key.label);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditLabel('');
+  };
+
+  const handleRename = async () => {
+    if (!editingId) return;
+    setSaving(true);
+    setError(null);
+    const result = await updateApiKeyLabel(editingId, editLabel);
+    setSaving(false);
+    if (result.success) {
+      setKeys((prev) =>
+        prev.map((k) => (k.id === editingId ? { ...k, label: editLabel.trim() } : k)),
+      );
+      cancelEditing();
+    } else {
+      setError(result.error ?? 'Failed to rename key.');
+    }
   };
 
   const activeKeys = keys.filter((k) => k.is_active);
@@ -166,7 +197,54 @@ export function ApiKeyList() {
                 <CardContent className="py-4 flex items-center justify-between">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">{k.label}</span>
+                      {editingId === k.id ? (
+                        <div className="flex items-center gap-1">
+                          <Input
+                            value={editLabel}
+                            onChange={(e) => setEditLabel(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleRename();
+                              if (e.key === 'Escape') cancelEditing();
+                            }}
+                            disabled={saving}
+                            className="h-7 text-sm w-48"
+                            autoFocus
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleRename}
+                            disabled={saving || !editLabel.trim()}
+                            className="h-7 w-7 text-green-600 hover:text-green-800"
+                            title="Save"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={cancelEditing}
+                            disabled={saving}
+                            className="h-7 w-7"
+                            title="Cancel"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="font-medium text-sm">{k.label}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => startEditing(k)}
+                            className="h-6 w-6 text-gray-400 hover:text-gray-600"
+                            title="Rename key"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                        </>
+                      )}
                       <Badge variant="secondary" className="text-xs">Active</Badge>
                     </div>
                     <code className="text-xs text-gray-500 font-mono">{k.key_hint}</code>

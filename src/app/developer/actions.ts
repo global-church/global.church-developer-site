@@ -196,6 +196,42 @@ export async function revokeApiKey(keyId: string): Promise<{
   }
 }
 
+export async function updateApiKeyLabel(
+  keyId: string,
+  newLabel: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!isSupabaseConfigured()) {
+      return { success: false, error: 'Service not configured.' };
+    }
+
+    const trimmed = newLabel.trim();
+    if (!trimmed || trimmed.length > 100) {
+      return { success: false, error: 'Label must be between 1 and 100 characters.' };
+    }
+
+    const supabase = await createSupabaseServerActionClient();
+    const session = await ensureAuthenticated(supabase);
+
+    const { error } = await supabase
+      .from('api_keys')
+      .update({ label: trimmed })
+      .eq('id', keyId)
+      .eq('user_id', session.userId)
+      .eq('is_active', true);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to update key label.';
+    console.error('[updateApiKeyLabel] Error:', message);
+    return { success: false, error: message };
+  }
+}
+
 export async function updateProfile(data: {
   displayName?: string;
   company?: string;
