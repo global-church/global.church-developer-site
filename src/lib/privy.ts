@@ -55,11 +55,14 @@ export async function getPrivyUserEmail(userId: string): Promise<string | null> 
     const user = await client.getUser(userId);
     // Email may be on user.email (email login) or in linkedAccounts (Google OAuth)
     if (user.email?.address) return user.email.address;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const oauthAccount = user.linkedAccounts?.find((a: any) =>
-      a.type === 'google_oauth' || a.type === 'email'
-    ) as any;
-    return oauthAccount?.address ?? oauthAccount?.email ?? null;
+    for (const account of user.linkedAccounts ?? []) {
+      if (account.type === 'google_oauth' || account.type === 'email') {
+        if ('address' in account && typeof account.address === 'string') {
+          return account.address;
+        }
+      }
+    }
+    return null;
   } catch (error) {
     console.error('[getPrivyUserEmail] failed for', userId, error);
     return null;
