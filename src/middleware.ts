@@ -39,6 +39,8 @@ export async function middleware(request: NextRequest) {
   // Protected routes: check for Privy auth token cookie
   if (pathname.startsWith('/developer') || pathname.startsWith('/admin')) {
     const privyToken = request.cookies.get('privy-token')?.value;
+    const allCookieNames = request.cookies.getAll().map((c) => c.name);
+    console.log('[middleware]', pathname, 'privy-token:', privyToken ? 'present' : 'MISSING', 'cookies:', allCookieNames);
 
     if (!privyToken) {
       const url = request.nextUrl.clone();

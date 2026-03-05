@@ -13,7 +13,11 @@ export async function getServerSession(): Promise<UserSession | null> {
     .map(({ name, value }) => `${name}=${value}`)
     .join('; ');
 
+  const hasPrivyToken = cookieHeader.includes('privy-token');
+  console.log('[getServerSession] cookieHeader length:', cookieHeader.length, 'has privy-token:', hasPrivyToken);
+
   const claims = await verifyPrivyToken(cookieHeader);
+  console.log('[getServerSession] claims:', claims);
   if (!claims) return null;
 
   // Privy doesn't embed email in the token; we look it up from the DB.
