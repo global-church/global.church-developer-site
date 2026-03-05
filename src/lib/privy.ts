@@ -37,7 +37,8 @@ export async function verifyPrivyToken(
   try {
     const claims = await client.verifyAuthToken(token);
     return { userId: claims.userId };
-  } catch {
+  } catch (error) {
+    console.error('[verifyPrivyToken] token verification failed:', error);
     return null;
   }
 }
