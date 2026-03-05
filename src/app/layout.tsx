@@ -5,6 +5,7 @@ import { Instrument_Sans, Onest } from "next/font/google";
 import "./globals.css";
 import { ConditionalLayout } from "@/components/ConditionalLayout";
 import PostHogAnalyticsProvider from './posthog-provider';
+import Providers from './providers';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
@@ -40,9 +41,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${instrumentSans.variable} ${onest.variable} antialiased bg-white flex flex-col min-h-screen`}>
-        <PostHogAnalyticsProvider>
-          <ConditionalLayout>{children}</ConditionalLayout>
-        </PostHogAnalyticsProvider>
+        <Providers>
+          <PostHogAnalyticsProvider>
+            <ConditionalLayout>{children}</ConditionalLayout>
+          </PostHogAnalyticsProvider>
+        </Providers>
         {/* Vercel Web Analytics (production only) */}
         <Analytics mode="production" />
         {/* Vercel Speed Insights */}

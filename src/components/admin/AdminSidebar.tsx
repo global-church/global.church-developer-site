@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Church, Users, ChevronDown, Menu, X } from 'lucide-react';
+import { Church, Users, ClipboardCheck, ChevronDown, Menu, X } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import Footer from '@/components/Footer';
@@ -17,6 +17,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { href: '/admin', label: 'Churches', icon: Church, roles: ['admin', 'editor', 'support'] },
+  { href: '/admin/claims', label: 'Claims', icon: ClipboardCheck, roles: ['admin', 'support'] },
   { href: '/admin/users', label: 'Users', icon: Users, roles: ['admin', 'support'] },
 ];
 

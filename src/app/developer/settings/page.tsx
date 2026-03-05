@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import { createSupabaseServerComponentClient } from '@/lib/supabaseServerClient';
-import { getCurrentSession } from '@/lib/session';
+import { getServerSession } from '@/lib/serverAuth';
+import { createServiceRoleClient } from '@/lib/supabaseServerClient';
 import { ProfileForm } from '@/components/developer/ProfileForm';
 
 export const metadata = {
@@ -8,11 +8,10 @@ export const metadata = {
 };
 
 export default async function SettingsPage() {
-  const supabase = await createSupabaseServerComponentClient();
-  const session = await getCurrentSession(supabase);
-
+  const session = await getServerSession();
   if (!session) redirect('/signin');
 
+  const supabase = createServiceRoleClient();
   const { data: profile } = await supabase
     .from('profiles')
     .select('display_name, email, company, website, bio')

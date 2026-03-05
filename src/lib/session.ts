@@ -1,6 +1,6 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-export type UserRole = 'admin' | 'support' | 'editor';
+export type UserRole = 'admin' | 'support' | 'editor' | 'data_steward' | 'developer';
 
 export type Permission =
   | 'church:read'
@@ -22,7 +22,7 @@ export type UserSession = {
   apiAccessApproved: boolean;
 };
 
-const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
+const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   admin: [
     'church:read',
     'church:create',
@@ -48,67 +48,115 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
 };
 
+function getServiceClient(): SupabaseClient {
+  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY.');
+  }
+
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
 /**
- * Get the current user's session with profile and roles.
- * Returns null if not authenticated.
+ * Get the current user's session by Privy user ID.
+ * Queries the unified profiles + user_roles tables via service role.
+ * Auto-provisions a new profile row if the user doesn't exist yet.
  */
 export async function getCurrentSession(
-  client: SupabaseClient,
+  privyUserId: string,
+  privyEmail?: string,
+  privyName?: string,
 ): Promise<UserSession | null> {
-  const {
-    data: { user },
-    error,
-  } = await client.auth.getUser();
+  const client = getServiceClient();
 
-  if (error || !user) return null;
-
-  const { data: profile } = await client
+  let { data: profile } = await client
     .from('profiles')
-    .select('display_name, avatar_url, api_access_approved')
-    .eq('id', user.id)
+    .select('id, email, display_name, avatar_url, api_access_approved, first_name, last_name')
+    .eq('id', privyUserId)
     .single();
+
+  // Auto-provision: create profile row on first Privy login
+  if (!profile && privyEmail) {
+    // Check if a legacy profile exists with this email (backfilled from migration)
+    const { data: legacyMatch } = await client
+      .from('profiles')
+      .select('id, email, display_name, avatar_url, api_access_approved, first_name, last_name, company, website, bio')
+      .eq('email', privyEmail)
+      .single();
+
+    if (legacyMatch && legacyMatch.id.startsWith('legacy:')) {
+      // Upgrade legacy profile: replace temporary ID with Privy DID
+      await client
+        .from('profiles')
+        .update({ id: privyUserId, auth_provider: 'privy', updated_at: new Date().toISOString() })
+        .eq('id', legacyMatch.id);
+
+      // Also update user_roles, org_memberships, and api_keys FK references
+      await Promise.all([
+        client.from('user_roles').update({ user_id: privyUserId }).eq('user_id', legacyMatch.id),
+        client.from('org_memberships').update({ user_id: privyUserId }).eq('user_id', legacyMatch.id),
+        client.from('api_keys').update({ privy_user_id: privyUserId }).eq('privy_user_id', legacyMatch.id),
+      ]);
+
+      profile = { ...legacyMatch, id: privyUserId };
+    } else if (legacyMatch) {
+      // Profile exists with a real Privy ID already (maybe from engage)
+      profile = legacyMatch;
+    } else {
+      // Brand new user — create fresh profile
+      const displayName = privyName ?? privyEmail.split('@')[0];
+      const { data: newProfile } = await client
+        .from('profiles')
+        .insert({
+          id: privyUserId,
+          email: privyEmail,
+          display_name: displayName,
+          auth_provider: 'privy',
+        })
+        .select('id, email, display_name, avatar_url, api_access_approved, first_name, last_name')
+        .single();
+
+      profile = newProfile;
+    }
+  }
+
+  if (!profile) return null;
 
   const { data: roleRows } = await client
     .from('user_roles')
     .select('role')
-    .eq('user_id', user.id)
+    .eq('user_id', profile.id)
     .eq('is_active', true);
 
   const roles = (roleRows ?? []).map((r) => r.role as UserRole);
+  const displayName = profile.display_name
+    ?? ([profile.first_name, profile.last_name].filter(Boolean).join(' ') || null);
 
   return {
-    userId: user.id,
-    email: user.email ?? '',
-    displayName: profile?.display_name ?? null,
-    avatarUrl: profile?.avatar_url ?? null,
+    userId: profile.id,
+    email: profile.email ?? '',
+    displayName,
+    avatarUrl: profile.avatar_url ?? null,
     roles,
-    apiAccessApproved: profile?.api_access_approved ?? false,
+    apiAccessApproved: profile.api_access_approved ?? false,
   };
 }
 
-/**
- * Check if the session has at least one of the specified roles.
- */
 export function hasRole(session: UserSession, ...requiredRoles: UserRole[]): boolean {
   return session.roles.some((r) => requiredRoles.includes(r));
 }
 
-/**
- * Check if the session has a specific permission.
- */
 export function hasPermission(session: UserSession, permission: Permission): boolean {
   return session.roles.some((role) => ROLE_PERMISSIONS[role]?.includes(permission));
 }
 
-/**
- * Guard: ensures the user is authenticated and has at least one of the required roles.
- * Throws on failure.
- */
 export async function ensureRole(
-  client: SupabaseClient,
+  privyUserId: string,
   ...requiredRoles: UserRole[]
 ): Promise<UserSession> {
-  const session = await getCurrentSession(client);
+  const session = await getCurrentSession(privyUserId);
   if (!session) {
     throw new Error('Authentication required. Please sign in.');
   }
@@ -118,14 +166,12 @@ export async function ensureRole(
   return session;
 }
 
-/**
- * Guard: ensures the user is authenticated (any user type).
- * Throws on failure.
- */
 export async function ensureAuthenticated(
-  client: SupabaseClient,
+  privyUserId: string,
+  privyEmail?: string,
+  privyName?: string,
 ): Promise<UserSession> {
-  const session = await getCurrentSession(client);
+  const session = await getCurrentSession(privyUserId, privyEmail, privyName);
   if (!session) {
     throw new Error('Authentication required. Please sign in.');
   }

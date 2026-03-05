@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import { createSupabaseServerComponentClient } from '@/lib/supabaseServerClient';
-import { getCurrentSession, hasRole } from '@/lib/session';
+import { getServerSession } from '@/lib/serverAuth';
+import { hasRole } from '@/lib/session';
 import { AdminUsersTable } from '@/components/admin/AdminUsersTable';
 
 export const dynamic = 'force-dynamic';
@@ -10,10 +10,8 @@ export const metadata = {
 };
 
 export default async function AdminUsersPage() {
-  const supabase = await createSupabaseServerComponentClient();
-  const session = await getCurrentSession(supabase);
+  const session = await getServerSession();
 
-  // Layout already ensures user has a role, but this page needs admin or support specifically
   if (!session || !hasRole(session, 'admin', 'support')) {
     redirect('/admin');
   }

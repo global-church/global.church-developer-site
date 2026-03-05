@@ -1,20 +1,19 @@
-import { createSupabaseServerComponentClient } from '@/lib/supabaseServerClient';
-import { getCurrentSession } from '@/lib/session';
+import { getServerSession } from '@/lib/serverAuth';
+import { createServiceRoleClient } from '@/lib/supabaseServerClient';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Key, Settings, BookOpen, MessageSquare } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default async function DashboardPage() {
-  const supabase = await createSupabaseServerComponentClient();
-  const session = await getCurrentSession(supabase);
-
+  const session = await getServerSession();
   if (!session) redirect('/signin');
 
+  const supabase = createServiceRoleClient();
   const { count: keyCount } = await supabase
     .from('api_keys')
     .select('id', { count: 'exact', head: true })
-    .eq('user_id', session.userId)
+    .eq('privy_user_id', session.userId)
     .eq('is_active', true);
 
   return (

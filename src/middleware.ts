@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { createSupabaseMiddlewareClient, isSupabaseConfigured } from '@/lib/supabaseServerClient';
 
 const PUBLIC_PATHS = new Set([
   '/',
@@ -15,7 +14,7 @@ const PUBLIC_PATHS = new Set([
   '/request-access',
   '/signin',
   '/signup',
-  '/login', // redirects to /signin
+  '/login',
   '/reset-password',
 ]);
 
@@ -23,11 +22,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const response = NextResponse.next({ request });
 
-  // Skip static files and API routes.
-  // All /api/ routes are intentionally public (e.g. /api/feedback, /api/request-access, /api/ask).
-  // If you add a future API route that requires auth, either:
-  //   (a) add auth checks inside that route handler directly, or
-  //   (b) use a /api/protected/* prefix and add a guard below similar to /developer/*.
+  // Skip static files and API routes
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/') ||
@@ -36,42 +31,27 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // If Supabase is not configured, skip auth checks entirely
-  if (!isSupabaseConfigured()) {
-    return response;
-  }
-
-  const supabase = createSupabaseMiddlewareClient(request, response);
-
-  // Refresh session — important for Supabase SSR cookie management
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   // Public routes and dynamic church pages pass through
   if (PUBLIC_PATHS.has(pathname) || pathname.startsWith('/church/')) {
     return response;
   }
 
-  // Protected: /developer/*
-  if (pathname.startsWith('/developer')) {
-    if (!user) {
-      const url = request.nextUrl.clone();
-      url.pathname = '/signin';
-      url.searchParams.set('redirect', pathname);
-      return NextResponse.redirect(url);
-    }
-    return response;
-  }
+  // Protected routes: check for Privy auth token cookie
+  if (pathname.startsWith('/developer') || pathname.startsWith('/admin')) {
+    const privyToken = request.cookies.get('privy-token')?.value;
 
-  // Protected: /admin/*
-  if (pathname.startsWith('/admin')) {
-    if (!user) {
+    if (!privyToken) {
       const url = request.nextUrl.clone();
       url.pathname = '/signin';
+      if (pathname.startsWith('/developer')) {
+        url.searchParams.set('redirect', pathname);
+      }
       return NextResponse.redirect(url);
     }
-    // Fine-grained role checks happen at the page level
+
+    // Token exists — let the page-level auth verify it fully
+    // (middleware can't do async Privy verification efficiently;
+    //  the server components verify the token and get the user ID)
     return response;
   }
 

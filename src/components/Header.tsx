@@ -6,10 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Menu, X, ChevronDown, Shield, LayoutDashboard, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useSession } from "@/hooks/useSession";
-import { useSupabaseBrowserClient } from "@/hooks/useSupabaseBrowserClient";
+import { useAuth } from "@/contexts/AuthContext";
 import { useUserSession } from "@/contexts/SessionContext";
-import { signOut } from "@/app/(auth)/actions";
 
 const navLinks = [
   { href: "/explorer", label: "Church Explorer" },
@@ -22,38 +20,12 @@ const navLinks = [
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [clientRoles, setClientRoles] = useState<string[]>([]);
   const pathname = usePathname() ?? '/';
   const router = useRouter();
-  const { user, loading } = useSession();
-  const supabase = useSupabaseBrowserClient();
+  const { user, loading, isAuthenticated, disconnect } = useAuth();
   const userSession = useUserSession();
   const userMenuRef = useRef<HTMLDivElement>(null);
   const userMenuButtonRef = useRef<HTMLButtonElement>(null);
-
-  // Fetch roles client-side when userSession (from SessionContext) is not available
-  // This happens on public pages where there's no SessionProvider wrapping the Header
-  useEffect(() => {
-    if (userSession || !user?.id) {
-      setClientRoles([]);
-      return;
-    }
-    if (!supabase) {
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      const { data } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .eq("is_active", true);
-      if (!cancelled && data) {
-        setClientRoles(data.map((r: { role: string }) => r.role));
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [user?.id, userSession, supabase]);
 
   // Close user dropdown on outside click / escape
   useEffect(() => {
@@ -87,30 +59,23 @@ export default function Header() {
   const handleSignOut = async () => {
     setIsUserMenuOpen(false);
     setIsMenuOpen(false);
-    // Sign out on the browser client first so onAuthStateChange fires immediately
-    // and clears the user state, then sign out on the server to clear the cookie
-    await supabase?.auth.signOut();
-    await signOut();
+    await disconnect();
     router.push("/");
     router.refresh();
   };
 
-  const isAuthenticated = !!user;
-
-  // Display name from rich session (developer/admin) or basic user
   const displayName =
     userSession?.displayName ||
-    (user?.user_metadata?.full_name as string | undefined) ||
+    user?.name ||
     user?.email ||
     "Account";
 
   const hasRoles = userSession
     ? userSession.roles.length > 0
-    : clientRoles.length > 0;
+    : false;
 
-  // Derive initials for avatar
   const initials = (() => {
-    const name = userSession?.displayName || (user?.user_metadata?.full_name as string | undefined);
+    const name = userSession?.displayName || user?.name;
     if (name) {
       const parts = name.split(/\s+/).filter(Boolean);
       if (parts.length >= 2) return `${parts[0]![0]}${parts[1]![0]}`.toUpperCase();
@@ -155,7 +120,6 @@ export default function Header() {
           })}
 
           {!loading && isAuthenticated ? (
-            /* User dropdown */
             <div className="relative ml-2">
               <button
                 ref={userMenuButtonRef}

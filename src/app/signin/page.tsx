@@ -1,39 +1,52 @@
-import { redirect } from 'next/navigation';
-import { createSupabaseServerComponentClient, isSupabaseConfigured } from '@/lib/supabaseServerClient';
-import { getCurrentSession } from '@/lib/session';
-import { SignInForm } from '@/components/auth/SignInForm';
+'use client';
 
-export const dynamic = 'force-dynamic';
+import { useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 
-export const metadata = {
-  title: 'Sign In | Global.Church',
-};
+export default function SignInPage() {
+  const { isAuthenticated, loading, connect } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirect = searchParams?.get('redirect') ?? null;
+  const error = searchParams?.get('error') ?? null;
 
-export default async function SignInPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ redirect?: string; error?: string }>;
-}) {
-  const params = await searchParams;
-
-  if (isSupabaseConfigured()) {
-    const supabase = await createSupabaseServerComponentClient();
-    const session = await getCurrentSession(supabase);
-
-    if (session) {
-      redirect('/developer');
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      router.replace(redirect ?? '/developer');
     }
-  }
+  }, [isAuthenticated, loading, router, redirect]);
 
   return (
     <div className="flex min-h-[80vh] items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md">
-        {params.error && (
-          <div className="mb-6 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {params.error}
+      <div className="w-full max-w-md text-center space-y-6">
+        {error && (
+          <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {error}
           </div>
         )}
-        <SignInForm redirectTo={params.redirect} />
+
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+            Sign in to Global.Church
+          </h1>
+          <p className="text-gray-500 mt-2">
+            Access your developer portal, API keys, and admin tools.
+          </p>
+        </div>
+
+        {loading ? (
+          <div className="text-gray-400 text-sm">Loading...</div>
+        ) : isAuthenticated ? (
+          <div className="text-gray-400 text-sm">Redirecting...</div>
+        ) : (
+          <button
+            onClick={connect}
+            className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+          >
+            Sign In
+          </button>
+        )}
       </div>
     </div>
   );

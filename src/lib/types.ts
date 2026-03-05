@@ -141,3 +141,24 @@ export type ZuploListResponse<T> = {
   hasMore: boolean;
   nextCursor: string | null;
 };
+
+export interface Claim {
+  id: string;
+  user_email: string;
+  user_first_name: string | null;
+  user_last_name: string | null;
+  org_uri: string | null;
+  org_name: string;
+  is_new_org: boolean;
+  email_domain: string;
+  org_domain: string | null;
+  domain_match: boolean;
+  status: 'pending' | 'approved' | 'rejected';
+  result_variant: string;
+  new_org_website: string | null;
+  new_org_type: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
+  created_at: string;
+}

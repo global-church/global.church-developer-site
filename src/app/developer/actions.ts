@@ -1,7 +1,7 @@
 'use server';
 
-import { createSupabaseServerActionClient, isSupabaseConfigured } from '@/lib/supabaseServerClient';
-import { ensureAuthenticated } from '@/lib/session';
+import { createServiceRoleClient, isSupabaseConfigured } from '@/lib/supabaseServerClient';
+import { getServerSession } from '@/lib/serverAuth';
 import {
   createZuploConsumerWithKey,
   createZuploApiKey,
@@ -36,24 +36,31 @@ function maskKey(key: string): string {
   return `${key.slice(0, 4)}****${key.slice(-4)}`;
 }
 
+async function requireSession() {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Service not configured.');
+  }
+  const session = await getServerSession();
+  if (!session) {
+    throw new Error('Authentication required. Please sign in.');
+  }
+  return session;
+}
+
 export async function createApiKey(label: string): Promise<CreateKeyResult> {
   try {
-    if (!isSupabaseConfigured()) {
-      return { success: false, error: 'Service not configured.' };
-    }
-
-    const supabase = await createSupabaseServerActionClient();
-    const session = await ensureAuthenticated(supabase);
+    const session = await requireSession();
 
     if (!session.apiAccessApproved) {
       return { success: false, error: 'Your account has not been approved for API access yet.' };
     }
 
-    // Check key limit
+    const supabase = createServiceRoleClient();
+
     const { count } = await supabase
       .from('api_keys')
       .select('id', { count: 'exact', head: true })
-      .eq('user_id', session.userId)
+      .eq('privy_user_id', session.userId)
       .eq('is_active', true);
 
     if ((count ?? 0) >= MAX_KEYS_PER_USER) {
@@ -66,20 +73,17 @@ export async function createApiKey(label: string): Promise<CreateKeyResult> {
     const name = consumerName(session.userId);
     const keyLabel = label.trim() || 'Default';
 
-    // Check if consumer already exists
     const existing = await getZuploConsumer(name);
     let consumerId: string;
     let keyId: string;
     let apiKey: string;
 
     if (existing) {
-      // Consumer exists, create additional key
       consumerId = existing.id;
       const result = await createZuploApiKey(name, keyLabel);
       keyId = result.keyId;
       apiKey = result.apiKey;
     } else {
-      // Create new consumer with first key
       const result = await createZuploConsumerWithKey(name, `Developer: ${session.email}`, {
         user_id: session.userId,
         email: session.email,
@@ -91,9 +95,9 @@ export async function createApiKey(label: string): Promise<CreateKeyResult> {
 
     const keyHint = maskKey(apiKey);
 
-    // Store reference in Supabase
     const { error: insertError } = await supabase.from('api_keys').insert({
       user_id: session.userId,
+      privy_user_id: session.userId,
       zuplo_consumer_id: consumerId,
       zuplo_key_id: keyId,
       key_hint: keyHint,
@@ -102,7 +106,6 @@ export async function createApiKey(label: string): Promise<CreateKeyResult> {
 
     if (insertError) {
       console.error('[createApiKey] Supabase insert error:', insertError.message);
-      // Clean up the orphaned Zuplo key so it doesn't stay active without a local record
       try {
         const cleanupName = consumerName(session.userId);
         await deleteZuploApiKey(cleanupName, keyId);
@@ -125,17 +128,13 @@ export async function listApiKeys(): Promise<{
   error?: string;
 }> {
   try {
-    if (!isSupabaseConfigured()) {
-      return { keys: [], error: 'Service not configured.' };
-    }
-
-    const supabase = await createSupabaseServerActionClient();
-    const session = await ensureAuthenticated(supabase);
+    const session = await requireSession();
+    const supabase = createServiceRoleClient();
 
     const { data, error } = await supabase
       .from('api_keys')
       .select('id, label, key_hint, is_active, created_at, revoked_at')
-      .eq('user_id', session.userId)
+      .eq('privy_user_id', session.userId)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -155,27 +154,20 @@ export async function revokeApiKey(keyId: string): Promise<{
   error?: string;
 }> {
   try {
-    if (!isSupabaseConfigured()) {
-      return { success: false, error: 'Service not configured.' };
-    }
+    const session = await requireSession();
+    const supabase = createServiceRoleClient();
 
-    const supabase = await createSupabaseServerActionClient();
-    const session = await ensureAuthenticated(supabase);
-
-    // Fetch the key record (ownership enforced by RLS)
     const { data: keyRecord, error: fetchError } = await supabase
       .from('api_keys')
-      .select('id, zuplo_consumer_id, zuplo_key_id, user_id')
+      .select('id, zuplo_consumer_id, zuplo_key_id, privy_user_id')
       .eq('id', keyId)
-      .eq('user_id', session.userId)
+      .eq('privy_user_id', session.userId)
       .single();
 
     if (fetchError || !keyRecord) {
       return { success: false, error: 'API key not found.' };
     }
 
-    // Delete from Zuplo first — if this fails, do NOT mark as revoked locally
-    // so the user can retry. Otherwise the key stays active in Zuplo's gateway.
     const name = consumerName(session.userId);
     await deleteZuploApiKey(name, keyRecord.zuplo_key_id);
 
@@ -201,23 +193,20 @@ export async function updateApiKeyLabel(
   newLabel: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    if (!isSupabaseConfigured()) {
-      return { success: false, error: 'Service not configured.' };
-    }
+    const session = await requireSession();
 
     const trimmed = newLabel.trim();
     if (!trimmed || trimmed.length > 100) {
       return { success: false, error: 'Label must be between 1 and 100 characters.' };
     }
 
-    const supabase = await createSupabaseServerActionClient();
-    const session = await ensureAuthenticated(supabase);
+    const supabase = createServiceRoleClient();
 
     const { error } = await supabase
       .from('api_keys')
       .update({ label: trimmed })
       .eq('id', keyId)
-      .eq('user_id', session.userId)
+      .eq('privy_user_id', session.userId)
       .eq('is_active', true);
 
     if (error) {
@@ -238,12 +227,8 @@ export async function updateProfile(data: {
   website?: string;
   bio?: string;
 }): Promise<{ success: boolean; error?: string }> {
-  if (!isSupabaseConfigured()) {
-    return { success: false, error: 'Service not configured.' };
-  }
-
-  const supabase = await createSupabaseServerActionClient();
-  const session = await ensureAuthenticated(supabase);
+  const session = await requireSession();
+  const supabase = createServiceRoleClient();
 
   const updates: Record<string, string | null> = {};
   if (data.displayName !== undefined) updates.display_name = data.displayName.trim() || null;

@@ -1,17 +1,10 @@
 'use server';
 
-import { createClient, type PostgrestSingleResponse, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { AdminStatus, ChurchPublic } from '@/lib/types';
 import { hydrateChurchList, hydrateChurchPublic } from '@/lib/adminChurchHydration';
-import { createSupabaseServerActionClient, isSupabaseConfigured } from '@/lib/supabaseServerClient';
-import { ensureRole, type UserRole } from '@/lib/session';
-
-export type LoginFormState = {
-  success: boolean;
-  error?: string | null;
-  email?: string | null;
-  message?: string | null;
-};
+import { getServerSession } from '@/lib/serverAuth';
+import { hasRole, type UserRole, type UserSession } from '@/lib/session';
 
 export type ChurchUpdatePayload = {
   churchId: string;
@@ -48,11 +41,6 @@ export type AdminChurchListResult = {
 
 const SESSION_ERROR_MESSAGE = 'You have been signed out. Please log in again.';
 
-type AdminAuthCheck = {
-  supabase: SupabaseClient | null;
-  error: string | null;
-};
-
 function resolveSupabaseCredentials(): { url: string; key: string; table: string } | { error: string } {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -81,75 +69,19 @@ function createSupabaseAdminClient() {
 }
 
 async function verifyAdminAccess(
-  existingClient?: SupabaseClient,
   requiredRoles: UserRole[] = ['admin', 'support', 'editor'],
-): Promise<AdminAuthCheck> {
-  if (!isSupabaseConfigured()) {
-    return { supabase: existingClient ?? null, error: 'Supabase credentials are not configured.' };
+): Promise<{ session: UserSession | null; error: string | null }> {
+  const session = await getServerSession();
+
+  if (!session) {
+    return { session: null, error: SESSION_ERROR_MESSAGE };
   }
 
-  const supabase = existingClient ?? await createSupabaseServerActionClient();
-
-  try {
-    await ensureRole(supabase, ...requiredRoles);
-    return { supabase, error: null };
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : SESSION_ERROR_MESSAGE;
-    return { supabase, error: message };
-  }
-}
-
-export async function authenticateAdmin(prevState: LoginFormState, formData: FormData): Promise<LoginFormState> {
-  if (!isSupabaseConfigured()) {
-    return {
-      success: false,
-      error: 'Supabase credentials are missing. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.',
-    };
+  if (requiredRoles.length > 0 && !hasRole(session, ...requiredRoles)) {
+    return { session, error: 'You do not have permission to perform this action.' };
   }
 
-  const rawEmail = formData.get('email');
-
-  if (!rawEmail || typeof rawEmail !== 'string') {
-    return { success: false, error: 'Email is required.' };
-  }
-
-  const email = rawEmail.trim().toLowerCase();
-
-  const supabase = await createSupabaseServerActionClient();
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: `${process.env.SITE_URL ?? 'http://localhost:3000'}/api/auth/callback`,
-    },
-  });
-
-  if (error) {
-    return { success: false, error: error.message, email };
-  }
-
-  return {
-    success: true,
-    email,
-    message: 'Check your email for a sign-in link.',
-  };
-}
-
-export async function logoutAdmin(): Promise<void> {
-  if (!isSupabaseConfigured()) {
-    return;
-  }
-
-  const supabase = await createSupabaseServerActionClient();
-  await supabase.auth.signOut({ scope: 'local' });
-}
-
-async function ensureAuthenticated(): Promise<string | null> {
-  const { error } = await verifyAdminAccess();
-  if (error) {
-    return error;
-  }
-  return null;
+  return { session, error: null };
 }
 
 function scrubPayload(values: Partial<ChurchPublic>): Record<string, unknown> {
@@ -185,22 +117,8 @@ function escapeILikePattern(value: string): string {
   return value.replace(/[%_]/g, (char) => `\\${char}`);
 }
 
-function mapResponse(
-  response: PostgrestSingleResponse<ChurchPublic>,
-): CreateChurchResult {
-  if (response.error) {
-    return { success: false, error: response.error.message };
-  }
-
-  if (!response.data) {
-    return { success: false, error: 'Operation completed but no record was returned.' };
-  }
-
-  return { success: true, data: response.data };
-}
-
 export async function saveChurchChanges(payload: ChurchUpdatePayload): Promise<SaveChurchResult> {
-  const authError = await ensureAuthenticated();
+  const { error: authError } = await verifyAdminAccess();
   if (authError) {
     return { success: false, error: authError };
   }
@@ -228,7 +146,13 @@ export async function saveChurchChanges(payload: ChurchUpdatePayload): Promise<S
       .select()
       .maybeSingle();
 
-    return mapResponse(response);
+    if (response.error) {
+      return { success: false, error: response.error.message };
+    }
+    if (!response.data) {
+      return { success: false, error: 'Operation completed but no record was returned.' };
+    }
+    return { success: true, data: response.data };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { success: false, error: message };
@@ -236,7 +160,7 @@ export async function saveChurchChanges(payload: ChurchUpdatePayload): Promise<S
 }
 
 export async function createChurch(payload: CreateChurchPayload): Promise<CreateChurchResult> {
-  const authError = await ensureAuthenticated();
+  const { error: authError } = await verifyAdminAccess();
   if (authError) {
     return { success: false, error: authError };
   }
@@ -258,7 +182,13 @@ export async function createChurch(payload: CreateChurchPayload): Promise<Create
       .select()
       .maybeSingle();
 
-    return mapResponse(response);
+    if (response.error) {
+      return { success: false, error: response.error.message };
+    }
+    if (!response.data) {
+      return { success: false, error: 'Operation completed but no record was returned.' };
+    }
+    return { success: true, data: response.data };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { success: false, error: message };
@@ -266,7 +196,7 @@ export async function createChurch(payload: CreateChurchPayload): Promise<Create
 }
 
 export async function fetchAdminChurchesByStatus(params: AdminChurchListParams): Promise<AdminChurchListResult> {
-  const authError = await ensureAuthenticated();
+  const { error: authError } = await verifyAdminAccess();
   if (authError) {
     throw new Error(authError);
   }
@@ -319,7 +249,7 @@ export async function fetchAdminChurchesByStatus(params: AdminChurchListParams):
 }
 
 export async function getAdminChurchById(churchId: string): Promise<ChurchPublic | null> {
-  const authError = await ensureAuthenticated();
+  const { error: authError } = await verifyAdminAccess();
   if (authError) {
     throw new Error(authError);
   }
@@ -378,12 +308,11 @@ export type UserListResult = {
 };
 
 export async function fetchUsers(params: UserListParams): Promise<UserListResult> {
-  const { error: authError } = await verifyAdminAccess(undefined, ['admin', 'support']);
+  const { error: authError } = await verifyAdminAccess(['admin', 'support']);
   if (authError) {
     throw new Error(authError);
   }
 
-  // Use service-role client so admins can read all profiles/roles/keys
   const { client: adminClient, error: clientError } = createSupabaseAdminClient();
   if (!adminClient || clientError) {
     throw new Error(clientError ?? 'Failed to initialise admin client.');
@@ -423,8 +352,8 @@ export async function fetchUsers(params: UserListParams): Promise<UserListResult
 
   const { data: keyCounts } = await adminClient
     .from('api_keys')
-    .select('user_id')
-    .in('user_id', userIds)
+    .select('privy_user_id')
+    .in('privy_user_id', userIds)
     .eq('is_active', true);
 
   const roleMap = new Map<string, string[]>();
@@ -436,7 +365,7 @@ export async function fetchUsers(params: UserListParams): Promise<UserListResult
 
   const keyCountMap = new Map<string, number>();
   for (const row of keyCounts ?? []) {
-    keyCountMap.set(row.user_id, (keyCountMap.get(row.user_id) ?? 0) + 1);
+    keyCountMap.set(row.privy_user_id, (keyCountMap.get(row.privy_user_id) ?? 0) + 1);
   }
 
   const items: UserListItem[] = profiles.map((p) => ({
@@ -460,14 +389,11 @@ export async function assignRole(
   userId: string,
   role: UserRole,
 ): Promise<{ success: boolean; error?: string }> {
-  const { error: authError, supabase } = await verifyAdminAccess(undefined, ['admin']);
-  if (authError || !supabase) {
+  const { session, error: authError } = await verifyAdminAccess(['admin']);
+  if (authError || !session) {
     return { success: false, error: authError ?? 'Authentication failed.' };
   }
 
-  const session = await ensureRole(supabase, 'admin');
-
-  // Use service-role client — user_roles is locked down by RLS
   const { client: adminClient, error: clientError } = createSupabaseAdminClient();
   if (!adminClient || clientError) {
     return { success: false, error: clientError ?? 'Failed to initialise admin client.' };
@@ -494,12 +420,11 @@ export async function removeRole(
   userId: string,
   role: UserRole,
 ): Promise<{ success: boolean; error?: string }> {
-  const { error: authError } = await verifyAdminAccess(undefined, ['admin']);
+  const { error: authError } = await verifyAdminAccess(['admin']);
   if (authError) {
     return { success: false, error: authError };
   }
 
-  // Use service-role client — user_roles is locked down by RLS
   const { client: adminClient, error: clientError } = createSupabaseAdminClient();
   if (!adminClient || clientError) {
     return { success: false, error: clientError ?? 'Failed to initialise admin client.' };
@@ -522,12 +447,11 @@ export async function toggleApiAccess(
   userId: string,
   approved: boolean,
 ): Promise<{ success: boolean; error?: string }> {
-  const { error: authError } = await verifyAdminAccess(undefined, ['admin', 'support']);
+  const { error: authError } = await verifyAdminAccess(['admin', 'support']);
   if (authError) {
     return { success: false, error: authError };
   }
 
-  // Use service-role client — profiles.api_access_approved is protected by trigger/RLS
   const { client: adminClient, error: clientError } = createSupabaseAdminClient();
   if (!adminClient || clientError) {
     return { success: false, error: clientError ?? 'Failed to initialise admin client.' };
