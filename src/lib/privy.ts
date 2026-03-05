@@ -57,9 +57,10 @@ export async function getPrivyUserEmail(userId: string): Promise<string | null> 
     if (user.email?.address) return user.email.address;
     for (const account of user.linkedAccounts ?? []) {
       if (account.type === 'google_oauth' || account.type === 'email') {
-        if ('address' in account && typeof account.address === 'string') {
-          return account.address;
-        }
+        // Google OAuth uses 'email', email login uses 'address'
+        const raw = account as unknown as Record<string, unknown>;
+        const email = raw.email ?? raw.address;
+        if (typeof email === 'string') return email;
       }
     }
     return null;
