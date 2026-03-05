@@ -106,7 +106,7 @@ src/
 
 **Public**: `/api/churches/search`, `/api/churches/[id]`, `/api/churches/geojson`, `/api/feedback`, `/api/request-access`, `/api/youtube/latest`, `/api/facebook/validate`
 
-**Protected**: `/api/ask` (OpenAI MCP, rate-limited), `/api/admin/claims` (GET), `/api/admin/claims/review` (POST)
+**Protected**: `/api/ask` (OpenAI MCP, rate-limited), `/api/auth/me` (GET, session/roles), `/api/admin/claims` (GET), `/api/admin/claims/review` (POST)
 
 ## Middleware
 
