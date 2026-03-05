@@ -1,6 +1,6 @@
 import 'server-only';
-import { cookies, headers } from 'next/headers';
-import { verifyPrivyToken } from './privy';
+import { cookies } from 'next/headers';
+import { verifyPrivyToken, getPrivyUserEmail } from './privy';
 import { getCurrentSession, type UserSession } from './session';
 
 /**
@@ -13,16 +13,16 @@ export async function getServerSession(): Promise<UserSession | null> {
     .map(({ name, value }) => `${name}=${value}`)
     .join('; ');
 
-  const hasPrivyToken = cookieHeader.includes('privy-token');
-  console.log('[getServerSession] cookieHeader length:', cookieHeader.length, 'has privy-token:', hasPrivyToken);
-
   const claims = await verifyPrivyToken(cookieHeader);
-  console.log('[getServerSession] claims:', claims);
   if (!claims) return null;
 
-  // Privy doesn't embed email in the token; we look it up from the DB.
-  // On first login the auto-provision in getCurrentSession handles creation.
-  return getCurrentSession(claims.userId);
+  // Try without email first (fast path — profile already exists)
+  const session = await getCurrentSession(claims.userId);
+  if (session) return session;
+
+  // Profile doesn't exist yet — look up email from Privy to auto-provision
+  const email = await getPrivyUserEmail(claims.userId);
+  return getCurrentSession(claims.userId, email ?? undefined);
 }
 
 /**

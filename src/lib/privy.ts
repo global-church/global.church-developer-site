@@ -43,6 +43,23 @@ export async function verifyPrivyToken(
   }
 }
 
+/**
+ * Look up a Privy user's email by their DID.
+ * Used for auto-provisioning when no email is available from the client.
+ */
+export async function getPrivyUserEmail(userId: string): Promise<string | null> {
+  const client = getPrivyClient();
+  if (!client) return null;
+
+  try {
+    const user = await client.getUser(userId);
+    return user.email?.address ?? null;
+  } catch (error) {
+    console.error('[getPrivyUserEmail] failed for', userId, error);
+    return null;
+  }
+}
+
 function parseCookies(header: string): Record<string, string> {
   const result: Record<string, string> = {};
   for (const pair of header.split(';')) {
