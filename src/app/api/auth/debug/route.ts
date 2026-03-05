@@ -58,13 +58,31 @@ export async function GET(request: NextRequest) {
     diagnostics.step4_privyUser = `ERROR: ${error instanceof Error ? error.message : String(error)}`;
   }
 
-  // Step 5: try getCurrentSession WITH email (auto-provision path)
+  // Step 5: test getPrivyUserEmail specifically
+  let resolvedEmail: string | null = null;
   try {
-    const email = await getPrivyUserEmail(claims.userId);
-    const session = await getCurrentSession(claims.userId, email ?? undefined);
-    diagnostics.step5_getCurrentSession_withEmail = session ?? 'null (still failed)';
+    resolvedEmail = await getPrivyUserEmail(claims.userId);
+    diagnostics.step5_getPrivyUserEmail = resolvedEmail ?? 'null';
   } catch (error) {
-    diagnostics.step5_getCurrentSession_withEmail = `ERROR: ${error instanceof Error ? error.message : String(error)}`;
+    diagnostics.step5_getPrivyUserEmail = `ERROR: ${error instanceof Error ? error.message : String(error)}`;
+  }
+
+  // Step 6: try getCurrentSession WITH email (auto-provision path)
+  if (resolvedEmail) {
+    try {
+      const session = await getCurrentSession(claims.userId, resolvedEmail);
+      diagnostics.step6_getCurrentSession_withEmail = session ?? 'null (still failed)';
+    } catch (error) {
+      diagnostics.step6_getCurrentSession_withEmail = `ERROR: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  } else {
+    // Try directly with known email as control test
+    try {
+      const session = await getCurrentSession(claims.userId, 'paul.martel@global.church');
+      diagnostics.step6_hardcoded_email = session ?? 'null (still failed even with hardcoded email)';
+    } catch (error) {
+      diagnostics.step6_hardcoded_email = `ERROR: ${error instanceof Error ? error.message : String(error)}`;
+    }
   }
 
   return NextResponse.json(diagnostics, { status: 200 });
