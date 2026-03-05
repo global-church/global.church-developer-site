@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { PrivyProvider } from '@privy-io/react-auth';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { SessionLoader } from '@/contexts/SessionContext';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
@@ -12,7 +13,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   if (!privyAppId) {
     return (
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider><SessionLoader>{children}</SessionLoader></AuthProvider>
       </QueryClientProvider>
     );
   }
@@ -34,7 +35,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       }}
     >
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider><SessionLoader>{children}</SessionLoader></AuthProvider>
       </QueryClientProvider>
     </PrivyProvider>
   );
