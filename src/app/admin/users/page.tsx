@@ -21,7 +21,7 @@ export default async function AdminUsersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">User Management</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-100">User Management</h1>
         <p className="text-slate-400 mt-1">
           View and manage developer accounts and team roles.
         </p>

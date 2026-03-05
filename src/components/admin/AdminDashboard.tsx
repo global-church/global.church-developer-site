@@ -310,7 +310,7 @@ export function AdminDashboard() {
     <div className="flex w-full flex-col gap-6">
       <header className="flex flex-col gap-4 border-b border-slate-800 pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Churches</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-100">Churches</h1>
           <p className="mt-1 text-sm text-slate-400">
             Search and manage churches across the Global.Church datasets.
           </p>

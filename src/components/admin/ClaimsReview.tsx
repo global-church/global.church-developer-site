@@ -173,7 +173,7 @@ export function ClaimsReview() {
   return (
     <div>
       <div className="flex items-center gap-3 mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Org Claims</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-100">Org Claims</h1>
         <Badge variant="secondary">{total}</Badge>
       </div>
 
