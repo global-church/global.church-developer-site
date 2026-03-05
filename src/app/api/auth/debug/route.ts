@@ -37,12 +37,25 @@ export async function GET(request: NextRequest) {
     diagnostics.step3_getCurrentSession_noEmail = `ERROR: ${error instanceof Error ? error.message : String(error)}`;
   }
 
-  // Step 4: look up email from Privy
+  // Step 4: look up full Privy user object
   try {
-    const email = await getPrivyUserEmail(claims.userId);
-    diagnostics.step4_getPrivyUserEmail = email ?? 'null (no email found)';
+    const { PrivyClient } = await import('@privy-io/server-auth');
+    const client = new PrivyClient(appId!, appSecret!);
+    const user = await client.getUser(claims.userId);
+    diagnostics.step4_privyUser = {
+      id: user.id,
+      email: user.email ?? 'undefined',
+      phone: user.phone ?? 'undefined',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      linkedAccounts: user.linkedAccounts?.map((a: any) => ({
+        type: a.type,
+        address: a.address ?? a.email,
+        verifiedAt: a.verifiedAt,
+      })),
+      createdAt: user.createdAt,
+    };
   } catch (error) {
-    diagnostics.step4_getPrivyUserEmail = `ERROR: ${error instanceof Error ? error.message : String(error)}`;
+    diagnostics.step4_privyUser = `ERROR: ${error instanceof Error ? error.message : String(error)}`;
   }
 
   // Step 5: try getCurrentSession WITH email (auto-provision path)
