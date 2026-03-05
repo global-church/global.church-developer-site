@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Gateway not configured' }, { status: 500 });
   }
 
-  const body = await req.text();
+  const body = await req.json();
 
   try {
     const res = await fetch(`${ZUPLO_API_URL}/v1/admin/claims/review`, {
@@ -23,9 +23,8 @@ export async function POST(req: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${ZUPLO_API_KEY}`,
-        'x-admin-email': session.email,
       },
-      body,
+      body: JSON.stringify({ ...body, adminEmail: session.email }),
     });
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
