@@ -1,21 +1,41 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function SignInPage() {
-  const { isAuthenticated, loading, connect } = useAuth();
+  const { isAuthenticated, user, loading, connect } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams?.get('redirect') ?? null;
   const error = searchParams?.get('error') ?? null;
+  const provisioningRef = useRef(false);
 
   useEffect(() => {
-    if (!loading && isAuthenticated) {
-      router.replace(redirect ?? '/developer');
-    }
-  }, [isAuthenticated, loading, router, redirect]);
+    if (loading || !isAuthenticated || provisioningRef.current) return;
+    provisioningRef.current = true;
+
+    // Ensure profile exists before redirecting to a protected page
+    fetch('/api/auth/provision', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: user?.email,
+        name: user?.name,
+      }),
+    })
+      .then((res) => {
+        if (!res.ok) {
+          console.error('Profile provision failed:', res.status);
+        }
+        router.replace(redirect ?? '/developer');
+      })
+      .catch((err) => {
+        console.error('Profile provision error:', err);
+        router.replace(redirect ?? '/developer');
+      });
+  }, [isAuthenticated, loading, user, router, redirect]);
 
   return (
     <div className="flex min-h-[80vh] items-center justify-center px-4 py-12">
