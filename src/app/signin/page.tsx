@@ -2,10 +2,12 @@
 
 import { useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { usePrivy } from '@privy-io/react-auth';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function SignInPage() {
   const { isAuthenticated, user, loading, connect } = useAuth();
+  const { getAccessToken } = usePrivy();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams?.get('redirect') ?? null;
@@ -16,26 +18,35 @@ export default function SignInPage() {
     if (loading || !isAuthenticated || provisioningRef.current) return;
     provisioningRef.current = true;
 
-    // Ensure profile exists before redirecting to a protected page
-    fetch('/api/auth/provision', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: user?.email,
-        name: user?.name,
-      }),
-    })
-      .then((res) => {
+    // Get the access token from Privy SDK and provision profile
+    getAccessToken().then((token) => {
+      if (!token) {
+        console.error('No Privy access token available');
+        router.replace(redirect ?? '/developer');
+        return;
+      }
+
+      return fetch('/api/auth/provision', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: user?.email,
+          name: user?.name,
+        }),
+      }).then((res) => {
         if (!res.ok) {
           console.error('Profile provision failed:', res.status);
         }
         router.replace(redirect ?? '/developer');
-      })
-      .catch((err) => {
-        console.error('Profile provision error:', err);
-        router.replace(redirect ?? '/developer');
       });
-  }, [isAuthenticated, loading, user, router, redirect]);
+    }).catch((err) => {
+      console.error('Profile provision error:', err);
+      router.replace(redirect ?? '/developer');
+    });
+  }, [isAuthenticated, loading, user, router, redirect, getAccessToken]);
 
   return (
     <div className="flex min-h-[80vh] items-center justify-center px-4 py-12">
