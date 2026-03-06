@@ -11,7 +11,13 @@ export type Permission =
   | 'users:manage'
   | 'roles:assign'
   | 'system:config'
-  | 'api_keys:view_all';
+  | 'api:access'
+  | 'api:keys:manage'
+  | 'api:keys:view_all'
+  | 'claims:review'
+  | 'claims:submit'
+  | 'data:ingest'
+  | 'data:read';
 
 export type UserSession = {
   userId: string;
@@ -22,29 +28,26 @@ export type UserSession = {
   apiAccessApproved: boolean;
 };
 
-const ROLE_PERMISSIONS: Record<string, Permission[]> = {
+const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   admin: [
-    'church:read',
-    'church:create',
-    'church:update',
-    'church:delete',
-    'users:read',
-    'users:manage',
-    'roles:assign',
-    'system:config',
-    'api_keys:view_all',
+    'church:read', 'church:create', 'church:update', 'church:delete',
+    'users:read', 'users:manage', 'roles:assign', 'system:config',
+    'api:access', 'api:keys:manage', 'api:keys:view_all',
+    'claims:review', 'claims:submit', 'data:ingest', 'data:read',
   ],
   support: [
-    'church:read',
-    'users:read',
-    'users:manage',
-    'api_keys:view_all',
+    'church:read', 'users:read', 'users:manage',
+    'api:keys:view_all', 'claims:review', 'data:read',
   ],
   editor: [
-    'church:read',
-    'church:create',
-    'church:update',
-    'church:delete',
+    'church:read', 'church:create', 'church:update', 'church:delete',
+    'data:read',
+  ],
+  data_steward: [
+    'church:read', 'data:ingest', 'data:read',
+  ],
+  developer: [
+    'api:access', 'api:keys:manage', 'data:read',
   ],
 };
 
@@ -140,7 +143,7 @@ export async function getCurrentSession(
     displayName,
     avatarUrl: profile.avatar_url ?? null,
     roles,
-    apiAccessApproved: profile.api_access_approved ?? false,
+    apiAccessApproved: roles.some((role) => ROLE_PERMISSIONS[role]?.includes('api:access')),
   };
 }
 

@@ -2,6 +2,7 @@
 
 import { createServiceRoleClient, isSupabaseConfigured } from '@/lib/supabaseServerClient';
 import { getServerSession } from '@/lib/serverAuth';
+import { hasPermission } from '@/lib/session';
 import {
   createZuploConsumerWithKey,
   createZuploApiKey,
@@ -51,7 +52,7 @@ export async function createApiKey(label: string): Promise<CreateKeyResult> {
   try {
     const session = await requireSession();
 
-    if (!session.apiAccessApproved) {
+    if (!hasPermission(session, 'api:access')) {
       return { success: false, error: 'Your account has not been approved for API access yet.' };
     }
 

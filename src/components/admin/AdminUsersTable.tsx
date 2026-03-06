@@ -9,13 +9,20 @@ import {
   fetchUsers,
   assignRole,
   removeRole,
-  toggleApiAccess,
   type UserListItem,
   type UserListResult,
 } from '@/app/admin/actions';
 import type { UserRole } from '@/lib/session';
 
-const ALL_ROLES: UserRole[] = ['admin', 'support', 'editor'];
+const ALL_ROLES: UserRole[] = ['admin', 'support', 'editor', 'data_steward', 'developer'];
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  admin: 'admin',
+  support: 'support',
+  editor: 'editor',
+  data_steward: 'steward',
+  developer: 'developer',
+};
 
 export function AdminUsersTable({ canAssignRoles }: { canAssignRoles: boolean }) {
   const [result, setResult] = useState<UserListResult | null>(null);
@@ -23,7 +30,6 @@ export function AdminUsersTable({ canAssignRoles }: { canAssignRoles: boolean })
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [confirmApiToggle, setConfirmApiToggle] = useState<UserListItem | null>(null);
   const [confirmRoleToggle, setConfirmRoleToggle] = useState<{ user: UserListItem; role: UserRole } | null>(null);
   const [toggling, setToggling] = useState(false);
 
@@ -66,19 +72,6 @@ export function AdminUsersTable({ canAssignRoles }: { canAssignRoles: boolean })
     load(query, cursor);
   };
 
-  const handleConfirmApiAccess = async () => {
-    if (!confirmApiToggle) return;
-    setToggling(true);
-    const res = await toggleApiAccess(confirmApiToggle.id, !confirmApiToggle.api_access_approved);
-    setToggling(false);
-    setConfirmApiToggle(null);
-    if (!res.success) {
-      setError(res.error ?? 'Failed to update API access.');
-      return;
-    }
-    load(query, cursor);
-  };
-
   return (
     <div className="space-y-4">
       <form onSubmit={handleSearch} className="flex gap-2">
@@ -104,7 +97,6 @@ export function AdminUsersTable({ canAssignRoles }: { canAssignRoles: boolean })
             <tr className="border-b border-slate-800 bg-slate-900/50">
               <th className="px-4 py-3 text-left font-medium text-slate-400">User</th>
               <th className="px-4 py-3 text-left font-medium text-slate-400">Roles</th>
-              <th className="px-4 py-3 text-left font-medium text-slate-400">API Access</th>
               <th className="px-4 py-3 text-left font-medium text-slate-400">Keys</th>
               <th className="px-4 py-3 text-left font-medium text-slate-400">Joined</th>
             </tr>
@@ -112,13 +104,13 @@ export function AdminUsersTable({ canAssignRoles }: { canAssignRoles: boolean })
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
                   Loading...
                 </td>
               </tr>
             ) : !result?.items.length ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
                   No users found.
                 </td>
               </tr>
@@ -157,7 +149,7 @@ export function AdminUsersTable({ canAssignRoles }: { canAssignRoles: boolean })
                               ) : (
                                 <ShieldOff className="h-3 w-3" />
                               )}
-                              {role}
+                              {ROLE_LABELS[role]}
                             </button>
                           );
                         })
@@ -173,23 +165,6 @@ export function AdminUsersTable({ canAssignRoles }: { canAssignRoles: boolean })
                         )
                       )}
                     </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => setConfirmApiToggle(user)}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium border transition-colors ${
-                        user.api_access_approved
-                          ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300 hover:bg-emerald-600/30'
-                          : 'bg-slate-800 border-slate-700 text-slate-500 hover:bg-slate-700 hover:text-slate-300'
-                      }`}
-                      title={user.api_access_approved ? 'Revoke API access' : 'Approve API access'}
-                    >
-                      <span className={`inline-block h-1.5 w-1.5 rounded-full ${
-                        user.api_access_approved ? 'bg-emerald-400' : 'bg-slate-600'
-                      }`} />
-                      {user.api_access_approved ? 'Approved' : 'Pending'}
-                    </button>
                   </td>
                   <td className="px-4 py-3 text-slate-400">
                     {user.api_key_count}
@@ -229,49 +204,6 @@ export function AdminUsersTable({ canAssignRoles }: { canAssignRoles: boolean })
             >
               Next <ChevronRight className="h-4 w-4" />
             </Button>
-          </div>
-        </div>
-      )}
-
-      {/* API Access confirmation dialog */}
-      {confirmApiToggle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="fixed inset-0 bg-black/50"
-            onClick={() => { if (!toggling) setConfirmApiToggle(null); }}
-          />
-          <div className="relative bg-slate-900 border border-slate-700 rounded-lg shadow-xl p-6 max-w-sm w-full mx-4">
-            <h3 className="text-sm font-semibold text-slate-100 mb-2">
-              {confirmApiToggle.api_access_approved ? 'Revoke API Access' : 'Approve API Access'}
-            </h3>
-            <p className="text-sm text-slate-400 mb-4">
-              {confirmApiToggle.api_access_approved
-                ? <>Are you sure you want to revoke API access for <span className="text-slate-200 font-medium">{confirmApiToggle.display_name || confirmApiToggle.email}</span>? They will no longer be able to create API keys.</>
-                : <>Approve API access for <span className="text-slate-200 font-medium">{confirmApiToggle.display_name || confirmApiToggle.email}</span>? They will be able to create and manage API keys.</>
-              }
-            </p>
-            <div className="flex items-center justify-end gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={toggling}
-                onClick={() => setConfirmApiToggle(null)}
-                className="text-slate-400 hover:text-slate-200"
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                disabled={toggling}
-                onClick={handleConfirmApiAccess}
-                className={confirmApiToggle.api_access_approved
-                  ? 'bg-red-600 hover:bg-red-700 text-white'
-                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                }
-              >
-                {toggling ? 'Updating...' : confirmApiToggle.api_access_approved ? 'Revoke' : 'Approve'}
-              </Button>
-            </div>
           </div>
         </div>
       )}

@@ -413,6 +413,14 @@ export async function assignRole(
     return { success: false, error: error.message };
   }
 
+  await adminClient.from('role_audit_log').insert({
+    target_user: userId,
+    action: 'grant',
+    role,
+    scope: 'platform',
+    performed_by: session.userId,
+  });
+
   return { success: true };
 }
 
@@ -420,9 +428,9 @@ export async function removeRole(
   userId: string,
   role: UserRole,
 ): Promise<{ success: boolean; error?: string }> {
-  const { error: authError } = await verifyAdminAccess(['admin']);
-  if (authError) {
-    return { success: false, error: authError };
+  const { session, error: authError } = await verifyAdminAccess(['admin']);
+  if (authError || !session) {
+    return { success: false, error: authError ?? 'Authentication failed.' };
   }
 
   const { client: adminClient, error: clientError } = createSupabaseAdminClient();
@@ -440,6 +448,14 @@ export async function removeRole(
     return { success: false, error: error.message };
   }
 
+  await adminClient.from('role_audit_log').insert({
+    target_user: userId,
+    action: 'revoke',
+    role,
+    scope: 'platform',
+    performed_by: session.userId,
+  });
+
   return { success: true };
 }
 
@@ -447,24 +463,9 @@ export async function toggleApiAccess(
   userId: string,
   approved: boolean,
 ): Promise<{ success: boolean; error?: string }> {
-  const { error: authError } = await verifyAdminAccess(['admin', 'support']);
-  if (authError) {
-    return { success: false, error: authError };
+  if (approved) {
+    return assignRole(userId, 'developer');
+  } else {
+    return removeRole(userId, 'developer');
   }
-
-  const { client: adminClient, error: clientError } = createSupabaseAdminClient();
-  if (!adminClient || clientError) {
-    return { success: false, error: clientError ?? 'Failed to initialise admin client.' };
-  }
-
-  const { error } = await adminClient
-    .from('profiles')
-    .update({ api_access_approved: approved })
-    .eq('id', userId);
-
-  if (error) {
-    return { success: false, error: error.message };
-  }
-
-  return { success: true };
 }
