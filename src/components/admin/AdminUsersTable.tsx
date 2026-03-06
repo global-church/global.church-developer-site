@@ -156,7 +156,7 @@ export function AdminUsersTable({ canAssignRoles }: { canAssignRoles: boolean })
                       ) : (
                         user.roles.length > 0 ? (
                           user.roles.map((role) => (
-                            <Badge key={role} variant="outline" className="text-xs">
+                            <Badge key={role} variant="outline" className="text-xs border-slate-600 text-slate-300">
                               {role}
                             </Badge>
                           ))
