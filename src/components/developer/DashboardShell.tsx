@@ -27,7 +27,8 @@ export function DashboardShell({
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const switcherRef = useRef<HTMLDivElement>(null);
 
-  const hasAdmin = session.roles.length > 0;
+  const ADMIN_ROLES = ['admin', 'support', 'editor', 'data_steward'];
+  const hasAdmin = session.roles.some((r) => ADMIN_ROLES.includes(r));
 
   // Close switcher on outside click
   useEffect(() => {
