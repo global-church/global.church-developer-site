@@ -296,7 +296,6 @@ export type UserListItem = {
   display_name: string | null;
   roles: string[];
   api_key_count: number;
-  api_access_approved: boolean;
   created_at: string;
 };
 
@@ -323,7 +322,7 @@ export async function fetchUsers(params: UserListParams): Promise<UserListResult
 
   let query = adminClient
     .from('profiles')
-    .select('id, email, display_name, api_access_approved, created_at', { count: 'exact' });
+    .select('id, email, display_name, created_at', { count: 'exact' });
 
   if (params.query) {
     const search = `%${escapeILikePattern(params.query.trim())}%`;
@@ -374,7 +373,6 @@ export async function fetchUsers(params: UserListParams): Promise<UserListResult
     display_name: p.display_name,
     roles: roleMap.get(p.id) ?? [],
     api_key_count: keyCountMap.get(p.id) ?? 0,
-    api_access_approved: p.api_access_approved ?? false,
     created_at: p.created_at,
   }));
 
@@ -459,13 +457,3 @@ export async function removeRole(
   return { success: true };
 }
 
-export async function toggleApiAccess(
-  userId: string,
-  approved: boolean,
-): Promise<{ success: boolean; error?: string }> {
-  if (approved) {
-    return assignRole(userId, 'developer');
-  } else {
-    return removeRole(userId, 'developer');
-  }
-}

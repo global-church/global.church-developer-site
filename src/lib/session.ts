@@ -25,7 +25,6 @@ export type UserSession = {
   displayName: string | null;
   avatarUrl: string | null;
   roles: UserRole[];
-  apiAccessApproved: boolean;
 };
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
@@ -76,7 +75,7 @@ export async function getCurrentSession(
 
   let { data: profile } = await client
     .from('profiles')
-    .select('id, email, display_name, avatar_url, api_access_approved, first_name, last_name')
+    .select('id, email, display_name, avatar_url, first_name, last_name')
     .eq('id', privyUserId)
     .single();
 
@@ -85,7 +84,7 @@ export async function getCurrentSession(
     // Check if a legacy profile exists with this email (backfilled from migration)
     const { data: legacyMatch } = await client
       .from('profiles')
-      .select('id, email, display_name, avatar_url, api_access_approved, first_name, last_name, company, website, bio')
+      .select('id, email, display_name, avatar_url, first_name, last_name, company, website, bio')
       .eq('email', privyEmail)
       .single();
 
@@ -118,7 +117,7 @@ export async function getCurrentSession(
           display_name: displayName,
           auth_provider: 'privy',
         })
-        .select('id, email, display_name, avatar_url, api_access_approved, first_name, last_name')
+        .select('id, email, display_name, avatar_url, first_name, last_name')
         .single();
 
       profile = newProfile;
@@ -143,7 +142,6 @@ export async function getCurrentSession(
     displayName,
     avatarUrl: profile.avatar_url ?? null,
     roles,
-    apiAccessApproved: roles.some((role) => ROLE_PERMISSIONS[role]?.includes('api:access')),
   };
 }
 

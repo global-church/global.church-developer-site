@@ -1,6 +1,7 @@
 'use client';
 
 import { useUserSession } from '@/contexts/SessionContext';
+import { hasPermission } from '@/lib/session';
 import { ApiKeyList } from '@/components/developer/ApiKeyList';
 import { RequestAccessForm } from '@/components/RequestAccessForm';
 import { Clock } from 'lucide-react';
@@ -10,7 +11,7 @@ export default function KeysPage() {
 
   if (!session) return null;
 
-  if (!session.apiAccessApproved) {
+  if (!hasPermission(session, 'api:access')) {
     return (
       <div className="space-y-8">
         <div>

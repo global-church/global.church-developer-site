@@ -91,16 +91,16 @@ src/
 - Rate-limited: 5 requests/min per IP
 
 ### Developer Portal (/developer)
-- Requires Privy auth + `api_access_approved=true` flag
+- Requires Privy auth + `developer` role (checked via `api:access` permission)
 - API key CRUD via Zuplo Dev API (create consumer → create key → store ref in Supabase)
 - Max 5 active keys per user
 - Profile management (display name, company, website, bio)
 
 ### Admin Dashboard (/admin)
 - Church management: search, filter by status (approved/needs_review/rejected), edit details
-- User management: assign roles (admin/support/editor), grant API access
-- Org claims review: approve/reject claims submitted from engage.global.church
-- Role-based access via Privy auth + user_roles table
+- User management: assign roles (admin/support/editor/data_steward/developer) with audit logging
+- Org claims review: approve/reject claims submitted from engage.global.church (admin + support)
+- Role-based access via Privy auth + `roles` reference table with FK-constrained `user_roles`
 
 ## API Routes
 
@@ -130,9 +130,11 @@ src/
 
 ## Supabase Tables
 
-- **profiles** — Unified user profiles (id=Privy DID, email, display_name, company, website, bio, api_access_approved)
+- **profiles** — Unified user profiles (id=Privy DID, email, display_name, company, website, bio)
+- **roles** — Reference table (name PK, scope: platform/org, description, rank). FK target for user_roles and org_memberships
+- **user_roles** — RBAC (user_id → profiles, role → roles, is_active, assigned_by). Unique on (user_id, role)
+- **role_audit_log** — Audit trail for role grants/revocations (target_user, action, role, performed_by, reason)
 - **api_keys** — Developer API keys (privy_user_id, zuplo_consumer_id, zuplo_key_id, key_hint, label, is_active)
-- **user_roles** — RBAC (user_id=Privy DID, role: admin/support/editor/data_steward/developer, is_active)
-- **org_memberships** — Org membership (user_email + user_id, org_uri, org_role)
+- **org_memberships** — Org membership (user_email + user_id, org_uri, org_role → roles)
 - **org_claims** — Org claim requests from onboarding
 - **churches** — Church records (full ChurchPublic schema, admin_status, pipeline_status)
