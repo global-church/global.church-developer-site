@@ -70,8 +70,9 @@ export default function Header() {
     user?.email ||
     "Account";
 
-  const hasRoles = userSession
-    ? userSession.roles.length > 0
+  const ADMIN_ROLES = ['admin', 'support', 'editor', 'data_steward'];
+  const hasAdminAccess = userSession
+    ? userSession.roles.some((r) => ADMIN_ROLES.includes(r))
     : false;
 
   const initials = (() => {
@@ -157,7 +158,7 @@ export default function Header() {
                     Developer Dashboard
                   </Link>
 
-                  {hasRoles && (
+                  {hasAdminAccess && (
                     <Link
                       href="/admin"
                       onClick={() => setIsUserMenuOpen(false)}
@@ -264,7 +265,7 @@ export default function Header() {
                       Developer Dashboard
                     </Link>
 
-                    {hasRoles && (
+                    {hasAdminAccess && (
                       <Link
                         href="/admin"
                         className="flex items-center gap-3 px-6 py-4 border-b text-gray-800 hover:bg-gray-50"
