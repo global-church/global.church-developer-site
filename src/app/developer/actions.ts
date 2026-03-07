@@ -86,7 +86,7 @@ export async function createApiKey(label: string): Promise<CreateKeyResult> {
       apiKey = result.apiKey;
     } else {
       const result = await createZuploConsumerWithKey(name, `Developer: ${session.email}`, {
-        user_id: session.userId,
+        privy_user_id: session.userId,
         email: session.email,
       });
       consumerId = result.consumerId;
