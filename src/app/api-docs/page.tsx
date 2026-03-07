@@ -24,13 +24,13 @@ export default function ApiPage() {
 
           {/* Column 2: Call-to-Action Card */}
           <div className="bg-gray-50 p-8 rounded-lg border border-gray-200">
-            <h3 className="text-xl font-semibold text-gray-900">API Playground</h3>
+            <h3 className="text-xl font-semibold text-gray-900">API Reference & Playground</h3>
             <p className="text-gray-600 mt-2 mb-6">
-              Interact with the live API, explore the available queries, and test your requests in our Zuplo-powered developer playground.
+              Explore the full API reference, interactive playground, and developer guides on our documentation portal.
             </p>
-            <Link href="https://global-church-main-ba4d06e.zuplo.site" target="_blank" rel="noopener noreferrer">
+            <Link href="https://docs.global.church/api" target="_blank" rel="noopener noreferrer">
               <Button size="lg" className="w-full">
-                Launch Playground
+                Open Developer Portal
                 <ExternalLink className="ml-2 size-4" />
               </Button>
             </Link>

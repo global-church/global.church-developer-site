@@ -24,13 +24,13 @@ export default function SchemaPage() {
 
           {/* Column 2: Call-to-Action Card */}
           <div className="bg-gray-50 p-8 rounded-lg border border-gray-200">
-            <h3 className="text-xl font-semibold text-gray-900">Schema Documentation</h3>
+            <h3 className="text-xl font-semibold text-gray-900">Ontology Reference</h3>
             <p className="text-gray-600 mt-2 mb-6">
-              View the complete, versioned schema documentation, including all types and fields, hosted on GitHub Pages.
+              Explore the full ontology documentation — OWL class and property tables, interactive WebVOWL graph, SKOS vocabulary browser, and architecture diagrams.
             </p>
-            <Link href="https://global-church.github.io/globalchurch-schema/" target="_blank" rel="noopener noreferrer">
+            <Link href="https://ontology.global.church" target="_blank" rel="noopener noreferrer">
               <Button size="lg" className="w-full">
-                View the Schema
+                View the Ontology
                 <ExternalLink className="ml-2 size-4" />
               </Button>
             </Link>
