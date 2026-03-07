@@ -25,10 +25,10 @@ export default async function ChurchPage(
     const rec = p as Record<string, unknown>
     if (typeof rec.id === 'string') id = rec.id
   }
-  const zuploUrl = process.env.ZUPLO_API_URL || null
-  const zuploKey = process.env.ZUPLO_API_KEY || null
+  const zuploUrl = process.env.GC_API_URL || null
+  const zuploKey = process.env.GC_API_KEY || null
   const zHost = (() => { try { return zuploUrl ? new URL(zuploUrl).host : null } catch { return null } })()
-  const attemptedUrl = zuploUrl && id ? `${zuploUrl}/v1/churches/${id}` : null
+  const attemptedUrl = zuploUrl && id ? `${zuploUrl}/v0/orgs/${id}` : null
   const looksUuid = typeof id === 'string' ? /^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.test(id) : false
   const nowIso = new Date().toISOString()
   const FALLBACK_FIELDS = [
@@ -38,7 +38,7 @@ export default async function ChurchPage(
     'belief_type','denomination','trinitarian','extraction_confidence','church_summary','is_weekly_church','campus_name','overarching_name','is_multi_campus',
     'geojson'
   ].join(',')
-  // const fallbackUrl = zuploUrl && id ? `${zuploUrl}/v1/churches/search?id=${id}&limit=1&fields=${encodeURIComponent(FALLBACK_FIELDS)}` : null
+  // const fallbackUrl = zuploUrl && id ? `${zuploUrl}/v0/orgs/search?id=${id}&limit=1&fields=${encodeURIComponent(FALLBACK_FIELDS)}` : null
 
   if (!id) {
     return (

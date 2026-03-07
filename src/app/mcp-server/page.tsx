@@ -11,7 +11,7 @@ interface Message {
   raw?: unknown;
 }
 
-const MCP_URL = 'https://global-church-main-ba4d06e.zuplo.app/mcp';
+const MCP_URL = process.env.NEXT_PUBLIC_MCP_URL || 'https://api.global.church/v0/mcp';
 
 export default function McpServerPage() {
   const [messages, setMessages] = useState<Message[]>([]);

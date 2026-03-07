@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/serverAuth';
 import { hasRole } from '@/lib/session';
 
-const ZUPLO_API_URL = process.env.ZUPLO_API_URL;
-const ZUPLO_API_KEY = process.env.ZUPLO_API_KEY;
+const GC_API_URL = process.env.GC_API_URL;
+const GC_API_KEY = process.env.GC_API_KEY;
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession();
@@ -11,19 +11,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  if (!ZUPLO_API_URL || !ZUPLO_API_KEY) {
+  if (!GC_API_URL || !GC_API_KEY) {
     return NextResponse.json({ error: 'Gateway not configured' }, { status: 500 });
   }
 
   const { searchParams } = req.nextUrl;
   const qs = searchParams.toString();
-  const path = `/v1/admin/claims${qs ? `?${qs}` : ''}`;
+  const path = `/v0/admin/claims${qs ? `?${qs}` : ''}`;
 
   try {
-    const res = await fetch(`${ZUPLO_API_URL}${path}`, {
+    const res = await fetch(`${GC_API_URL}${path}`, {
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${ZUPLO_API_KEY}`,
+        'Authorization': `Bearer ${GC_API_KEY}`,
         'x-admin-email': session.email,
       },
     });

@@ -120,7 +120,7 @@ src/
 - `PRIVY_APP_SECRET` — Privy app secret (server-only)
 - `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_URL` — Supabase URL
 - `SUPABASE_SERVICE_ROLE_KEY` — Supabase (server-only, service role for all DB access)
-- `ZUPLO_API_URL`, `ZUPLO_API_KEY` — Zuplo gateway (rotates every 90 days)
+- `GC_API_URL`, `GC_API_KEY` — API gateway at api.global.church (key rotates every 90 days)
 - `ZUPLO_DEV_API_KEY`, `ZUPLO_ACCOUNT_NAME`, `ZUPLO_BUCKET_NAME` — Zuplo Dev API for key management
 - `OPENAI_API_KEY` — For /api/ask route
 - `MCP_URL` — Remote MCP server endpoint

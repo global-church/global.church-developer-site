@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/serverAuth';
 import { hasRole } from '@/lib/session';
 
-const ZUPLO_API_URL = process.env.ZUPLO_API_URL;
-const ZUPLO_API_KEY = process.env.ZUPLO_API_KEY;
+const GC_API_URL = process.env.GC_API_URL;
+const GC_API_KEY = process.env.GC_API_KEY;
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession();
@@ -11,18 +11,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  if (!ZUPLO_API_URL || !ZUPLO_API_KEY) {
+  if (!GC_API_URL || !GC_API_KEY) {
     return NextResponse.json({ error: 'Gateway not configured' }, { status: 500 });
   }
 
   const body = await req.json();
 
   try {
-    const res = await fetch(`${ZUPLO_API_URL}/v1/admin/claims/review`, {
+    const res = await fetch(`${GC_API_URL}/v0/admin/claims/review`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${ZUPLO_API_KEY}`,
+        'Authorization': `Bearer ${GC_API_KEY}`,
       },
       body: JSON.stringify({ ...body, adminEmail: session.email }),
     });

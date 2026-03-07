@@ -5,19 +5,19 @@ import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
 export type { ZuploListResponse };
 
-const ZUPLO_API_URL = process.env.ZUPLO_API_URL;
-const ZUPLO_API_KEY = process.env.ZUPLO_API_KEY;
+const GC_API_URL = process.env.GC_API_URL;
+const GC_API_KEY = process.env.GC_API_KEY;
 
 function getZuploConfig(): { baseUrl: string; apiKey: string } {
-  if (!ZUPLO_API_URL || !ZUPLO_API_KEY) {
-    const urlStatus = ZUPLO_API_URL ? 'set' : 'unset';
-    const keyStatus = ZUPLO_API_KEY ? 'set' : 'unset';
+  if (!GC_API_URL || !GC_API_KEY) {
+    const urlStatus = GC_API_URL ? 'set' : 'unset';
+    const keyStatus = GC_API_KEY ? 'set' : 'unset';
     throw new Error(
-      `Zuplo API URL or Key is not defined. Set ZUPLO_API_URL and ZUPLO_API_KEY in .env.local (see .env.example). ` +
+      `API gateway URL or Key is not defined. Set GC_API_URL and GC_API_KEY in .env.local (see .env.example). ` +
       `(url: ${urlStatus}, key: ${keyStatus})`
     );
   }
-  return { baseUrl: ZUPLO_API_URL, apiKey: ZUPLO_API_KEY };
+  return { baseUrl: GC_API_URL, apiKey: GC_API_KEY };
 }
 
 function normaliseListResponse<T>(payload: unknown): ZuploListResponse<T> {
@@ -67,8 +67,8 @@ function normaliseListResponse<T>(payload: unknown): ZuploListResponse<T> {
 // A generic fetch function to handle calls to our Zuplo API
 async function fetchFromZuploAPI<T>(params: Record<string, unknown>): Promise<ZuploListResponse<T>> {
   const { baseUrl, apiKey } = getZuploConfig();
-  // All church search routes are served behind /v1/churches/search with query params
-  const url = new URL(`${baseUrl}/v1/churches/search`);
+  // All org search routes are served behind /v0/orgs/search with query params
+  const url = new URL(`${baseUrl}/v0/orgs/search`);
 
   // Append non-null parameters to the URL
   Object.entries(params).forEach(([key, value]) => {
@@ -153,7 +153,7 @@ export async function searchChurches(params: {
 export async function getChurchById(id: string): Promise<ChurchPublic | null> {
   if (!id) return null;
   const { baseUrl, apiKey } = getZuploConfig();
-  const url = new URL(`${baseUrl}/v1/churches/${id}`);
+  const url = new URL(`${baseUrl}/v0/orgs/${id}`);
   const headers: HeadersInit = { Authorization: `Bearer ${apiKey}` };
   const res = await fetch(url.toString(), { headers });
   if (!res.ok) {
@@ -278,7 +278,7 @@ export async function searchChurchesGeoJSON(params: {
   const { baseUrl, apiKey } = getZuploConfig();
   // Helper to build URL with params
   const buildUrl = () => {
-    const u = new URL(`${baseUrl}/v1/churches/search`);
+    const u = new URL(`${baseUrl}/v0/orgs/search`);
     Object.entries(params).forEach(([key, value]) => {
       if (value !== null && value !== undefined) {
         if (Array.isArray(value)) {
