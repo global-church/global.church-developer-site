@@ -97,7 +97,6 @@ export async function createApiKey(label: string): Promise<CreateKeyResult> {
     const keyHint = maskKey(apiKey);
 
     const { error: insertError } = await supabase.from('api_keys').insert({
-      user_id: session.userId,
       privy_user_id: session.userId,
       zuplo_consumer_id: consumerId,
       zuplo_key_id: keyId,
