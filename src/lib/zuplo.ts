@@ -5,7 +5,7 @@ import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 
 export type { ZuploListResponse };
 
-const GC_API_URL = process.env.GC_API_URL;
+const GC_API_URL = process.env.API_URL;
 const GC_API_KEY = process.env.GC_API_KEY;
 
 function getZuploConfig(): { baseUrl: string; apiKey: string } {
@@ -13,7 +13,7 @@ function getZuploConfig(): { baseUrl: string; apiKey: string } {
     const urlStatus = GC_API_URL ? 'set' : 'unset';
     const keyStatus = GC_API_KEY ? 'set' : 'unset';
     throw new Error(
-      `API gateway URL or Key is not defined. Set GC_API_URL and GC_API_KEY in .env.local (see .env.example). ` +
+      `API gateway URL or Key is not defined. Set API_URL and GC_API_KEY in .env.local (see .env.example). ` +
       `(url: ${urlStatus}, key: ${keyStatus})`
     );
   }

@@ -25,7 +25,7 @@ export default async function ChurchPage(
     const rec = p as Record<string, unknown>
     if (typeof rec.id === 'string') id = rec.id
   }
-  const zuploUrl = process.env.GC_API_URL || null
+  const zuploUrl = process.env.API_URL || null
   const zuploKey = process.env.GC_API_KEY || null
   const zHost = (() => { try { return zuploUrl ? new URL(zuploUrl).host : null } catch { return null } })()
   const attemptedUrl = zuploUrl && id ? `${zuploUrl}/v0/orgs/${id}` : null

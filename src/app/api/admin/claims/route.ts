@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/serverAuth';
 import { hasRole } from '@/lib/session';
 
-const GC_API_URL = process.env.GC_API_URL;
+const GC_API_URL = process.env.API_URL;
 const GC_API_KEY = process.env.GC_API_KEY;
 
 export async function GET(req: NextRequest) {
